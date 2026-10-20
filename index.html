@@ -788,6 +788,10 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
       <p class="note">1 = barely anything · 5 = vivid scenes</p>
     </div>
     <div class="row">
+      <span class="lbl">What did you see?</span>
+      <div class="presets" id="jTags" role="group" aria-label="What you saw"></div>
+    </div>
+    <div class="row">
       <label for="jText">Notes</label>
       <textarea id="jText" rows="5" placeholder="Colors, shapes, scenes, feelings…"></textarea>
     </div>
@@ -1265,6 +1269,26 @@ function micError(e) {
     NotFoundError: 'No microphone was found on this device.',
     NotReadableError: 'The microphone is busy in another app.'
   }[e?.name]) || 'Couldn\'t start the microphone' + (e ? ` (${e.name})` : '') + '.';
+}
+// Starts recording right away. Returns a stop() function, or null if the microphone couldn't start (onStatus gets the reason).
+async function startRecording({ onTick, onDone, onStatus, maxSecs = 180 }) {
+  let stream, rec;
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw null;
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  } catch (e) { onStatus(micError(e)); return null; }
+  try { rec = new MediaRecorder(stream); } catch { stream.getTracks().forEach(t => t.stop()); onStatus('This browser can\'t record audio.'); return null; }
+  const chunks = []; let secs = 0;
+  const timer = setInterval(() => { secs++; onTick(secs); if (secs >= maxSecs) rec.stop(); }, 1000);
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = () => {
+    clearInterval(timer); stream.getTracks().forEach(t => t.stop());
+    const b = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+    if (b.size < 1000) { onStatus('That recording came out empty. Try again.'); onDone(null, 0); return; }
+    onDone(b, secs);
+  };
+  rec.start(); onTick(0);
+  return () => { if (rec.state !== 'inactive') rec.stop(); };
 }
 function makeRecorder(btn, label, onStatus, onDone) {
   let rec = null;
@@ -2041,7 +2065,10 @@ async function startVR(override) {
 }
 
 // ================= Journal & history =================
-let journalEntry = null, jRating = 0, jVoice = null;
+// Quick tags for what you saw, shared by the flat journal and the VR lobby (no typing needed in the headset).
+const SEEN_TAGS = ['Colors', 'Geometric patterns', 'Tunnels or spirals', 'Movement', 'Faces', 'Figures or beings',
+                   'Scenes or places', 'Memories', 'Deep calm', 'Strong emotion', 'Nothing much'];
+let journalEntry = null, jRating = 0, jVoice = null, jTags = new Set();
 async function sessionEnded(S, reason) {
   const entry = await logEntry(S, reason);
   if (entry && entry.secs >= 20) openJournal(entry);
@@ -2056,7 +2083,8 @@ async function logEntry(S, reason) {
   return entry;
 }
 function openJournal(entry) {
-  journalEntry = entry; jRating = entry.rating || 0; jVoice = entry.voice || null;
+  journalEntry = entry; jRating = entry.rating || 0; jVoice = entry.voice || null; jTags = new Set(entry.tags || []);
+  paintTags();
   $('#jSum').textContent = fmtDate(entry.date) + ' · ' + fmtDur(entry.secs) + ' · ' + describe(entry.cfg);
   $('#jText').value = entry.note || '';
   $('#jPlay').disabled = !jVoice;
@@ -2065,6 +2093,12 @@ function openJournal(entry) {
   $('#journal').hidden = false;
   setTimeout(() => $('#jText').focus(), 50);
 }
+function paintTags() {
+  const box = $('#jTags');
+  if (!box.children.length) SEEN_TAGS.forEach(t => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.dataset.tag = t; b.textContent = t; box.append(b); });
+  $$('#jTags .chip').forEach(b => b.setAttribute('aria-pressed', jTags.has(b.dataset.tag)));
+}
+$('#jTags').addEventListener('click', e => { const b = e.target.closest('[data-tag]'); if (!b) return; jTags.has(b.dataset.tag) ? jTags.delete(b.dataset.tag) : jTags.add(b.dataset.tag); paintTags(); });
 function paintStars() { $$('#jStars .chip').forEach(b => b.setAttribute('aria-pressed', +b.dataset.r <= jRating)); }
 $('#jStars').addEventListener('click', e => { const b = e.target.closest('[data-r]'); if (!b) return; jRating = +b.dataset.r; paintStars(); });
 makeRecorder($('#jRec'), '● Voice note', m => $('#jRecStatus').textContent = m, (b, s) => {
@@ -2074,7 +2108,7 @@ playToggle($('#jPlay'), () => jVoice);
 $('#jSkip').addEventListener('click', () => { $('#journal').hidden = true; journalEntry = null; });
 $('#jSave').addEventListener('click', async () => {
   if (!journalEntry) return;
-  Object.assign(journalEntry, { rating: jRating, note: $('#jText').value.trim(), voice: jVoice });
+  Object.assign(journalEntry, { rating: jRating, note: $('#jText').value.trim(), voice: jVoice, tags: [...jTags] });
   await dbPut('sessions', journalEntry);
   $('#journal').hidden = true; journalEntry = null;
   renderHistory(); toast('Saved to your journal');
@@ -2121,11 +2155,12 @@ async function renderHistory() {
     const sum = document.createElement('p'); sum.className = 'entry-sum'; sum.textContent = describe(e.cfg);
     card.append(top, sum);
     if (e.rating) { const r = document.createElement('span'); r.className = 'rating'; r.textContent = '★'.repeat(e.rating) + '☆'.repeat(5 - e.rating); card.append(r); }
+    if (e.tags?.length) { const tg = document.createElement('p'); tg.className = 'entry-sum'; tg.textContent = 'Saw: ' + e.tags.join(', '); card.append(tg); }
     if (e.note) { const n = document.createElement('p'); n.className = 'entry-note'; n.textContent = e.note; card.append(n); }
     const acts = document.createElement('div'); acts.className = 'entry-actions';
     const mk = (txt, fn, cls = '') => { const b = document.createElement('button'); b.className = 'chip ' + cls; b.textContent = txt; b.addEventListener('click', () => fn(b)); acts.append(b); return b; };
     if (e.voice) playToggle(mk('▶ Voice note', () => {}), () => e.voice);
-    mk(e.note || e.rating ? 'Edit note' : 'Add note', () => openJournal(e));
+    mk(e.note || e.rating || e.tags?.length ? 'Edit note' : 'Add note', () => openJournal(e));
     mk('Use these settings', () => { loadCfg(e.cfg); window.scrollTo({ top: 0, behavior: 'smooth' }); });
     mk('Delete', b => {
       if (!b.classList.contains('confirm')) { b.classList.add('confirm', 'del'); b.textContent = 'Tap again to delete'; setTimeout(() => { b.classList.remove('confirm'); b.textContent = 'Delete'; }, 3000); return; }
@@ -2567,6 +2602,9 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   }
 
   const L = { view: 'journeys', sel: null, rating: 0, entry: null, saved: false, override: null,
+              tags: new Set(), voice: null, rec: null, recSecs: 0, recMsg: '', back: 'journeys',   // after-session notes
+              jList: [], jPage: 0, playing: null,                                                // journal
+
               tab: (() => { try { return localStorage.getItem('gf-lobbytab') || 'flicker'; } catch { return 'flicker'; } })() };
   function journeys() {
     if (L.tab === 'breath') return Object.entries(BREATH_STYLES).map(([k, v]) => ({ name: v.name, breath: k, short: v.short }));
@@ -2594,6 +2632,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       text('Choose a journey', 90, 150, `800 88px ${F.disp}`, C.fg);
       [['flicker', 'Flicker'], ['breath', 'Breath']].forEach(([k, label], i) =>
         pill('tab-' + k, PW - 90 - 2 * 300 - 20 + i * 320, 82, 300, 96, label, { selected: L.tab === k, size: 44 }, () => { L.tab = k; try { localStorage.setItem('gf-lobbytab', k); } catch {} panelDirty = true; }));
+      pill('journal', PW - 90 - 2 * 300 - 20 - 30 - 250, 82, 250, 96, 'Journal', { size: 44 }, () => openVRJournal());
       text('Point and pull the trigger to choose · squeeze the grip to bring this panel in front of you', 92, 212, `400 36px ${F.body}`, C.muted);
       const items = journeys(), cols = 3, gx = 30, cw = (PW - 180 - gx * (cols - 1)) / cols, ch = 214;
       items.forEach((it, i) => {
@@ -2637,7 +2676,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       text('JOURNEY', 92, 120, `400 32px ${F.mono}`, C.accent);
       text(it.name, 90, 220, `800 100px ${F.disp}`, C.fg);
       text(`${metaOf(it.cfg)} · ${roomOf(roomId).name}`, 92, 290, `400 38px ${F.mono}`, C.muted);
-      const why = it.cfg ? (RESEARCH.find(r => r.name === it.name) || {}).why : 'Uses your current settings from the flat-screen app.';
+      const why = it.why || (it.cfg ? (RESEARCH.find(r => r.name === it.name) || {}).why : 'Uses your current settings from the flat-screen app.');
       const n = wrap(why || '', 92, 380, 1500, 60, `400 44px ${F.body}`, C.fg, 5);
       wrap(describe(cfg), 92, 400 + n * 60 + 30, 1500, 46, `400 32px ${F.mono}`, C.muted, 3);
       rr(90, 860, 1860, 120, 24); cx.fillStyle = 'rgba(255,179,71,0.08)'; cx.fill(); cx.strokeStyle = 'rgba(255,179,71,0.5)'; cx.lineWidth = 3; cx.stroke();
@@ -2645,25 +2684,107 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       pill('back', 90, 1060, 300, 120, 'Back', { size: 44 }, () => { L.view = 'journeys'; panelDirty = true; });
       pill('begin', PW - 90 - 640, 1060, 640, 120, 'Begin', { primary: true, size: 54 }, () => begin());
     } else if (L.view === 'rating') {
-      text('Welcome back', 90, 200, `800 100px ${F.disp}`, C.fg);
-      text('How strong were the visuals?', 92, 300, `400 48px ${F.body}`, C.muted);
-      const size = 190, gap = 60, x0 = (PW - (size * 5 + gap * 4)) / 2;
+      // After a session (or when editing from the journal): rating, quick tags and a voice note. No typing needed.
+      const e = L.entry;
+      text(L.back === 'journal' ? 'Edit entry' : 'Welcome back', 90, 150, `800 88px ${F.disp}`, C.fg);
+      text(e ? `${fmtDate(e.date)} · ${fmtDur(e.secs)}` : '', 92, 212, `400 34px ${F.mono}`, C.muted);
+      text('How strong were the visuals?', 92, 300, `500 40px ${F.body}`, C.fg);
+      const size = 120, gap = 34, x0 = 92;
       for (let r = 1; r <= 5; r++) {
-        const x = x0 + (r - 1) * (size + gap), y = 400;
+        const x = x0 + (r - 1) * (size + gap), y = 330;
         button('r' + r, x, y, size, size, hi => {
           cx.beginPath(); cx.arc(x + size / 2, y + size / 2, size / 2 - 4, 0, Math.PI * 2);
           const on = r <= L.rating;
           cx.fillStyle = on ? 'rgba(255,179,71,0.22)' : hi ? C.cardHi : C.card; cx.fill();
           cx.lineWidth = 5; cx.strokeStyle = on ? C.warn : hi ? C.accent : C.line; cx.stroke();
-          text(String(r), x + size / 2, y + size / 2 + 30, `700 84px ${F.disp}`, on ? C.warn : C.fg, 'center');
-        }, () => { L.rating = r; panelDirty = true; });
+          text(String(r), x + size / 2, y + size / 2 + 22, `700 60px ${F.disp}`, on ? C.warn : C.fg, 'center');
+        }, () => { L.rating = L.rating === r ? 0 : r; L.saved = false; });
       }
-      text('barely anything', x0 + size / 2, 650, `400 32px ${F.body}`, C.muted, 'center');
-      text('vivid scenes', x0 + 4 * (size + gap) + size / 2, 650, `400 32px ${F.body}`, C.muted, 'center');
-      text(L.saved ? 'Saved to your journal.' : 'Add written notes later in the Journal on the flat screen.', 92, 800, `400 38px ${F.body}`, L.saved ? '#7ad7a0' : C.muted);
-      pill('skip', 90, 1060, 300, 120, L.saved ? 'Done' : 'Skip', { size: 44 }, () => { L.view = 'journeys'; L.saved = false; panelDirty = true; });
-      if (!L.saved) pill('save', PW - 90 - 640, 1060, 640, 120, 'Save rating', { primary: true, disabled: !L.rating, size: 54 }, () => saveRating());
+      text('1 = barely anything · 5 = vivid scenes', x0 + 5 * (size + gap) + 10, 405, `400 32px ${F.body}`, C.muted);
+      text('What did you see?', 92, 540, `500 40px ${F.body}`, C.fg);
+      let tx = 92, ty = 570;
+      SEEN_TAGS.forEach(t => {
+        cx.font = `500 36px ${F.body}`; const w = cx.measureText(t).width + 64;
+        if (tx + w > PW - 90) { tx = 92; ty += 96; }
+        pill('tag-' + t, tx, ty, w, 78, t, { selected: L.tags.has(t), size: 36 }, () => { L.tags.has(t) ? L.tags.delete(t) : L.tags.add(t); L.saved = false; });
+        tx += w + 16;
+      });
+      const vy = ty + 130;
+      pill('rec', 90, vy, 440, 90, L.rec ? `■ Stop · ${L.recSecs} s` : L.voice ? '● Record again' : '● Voice note', { selected: !!L.rec, size: 40 }, () => vrRecord());
+      if (L.voice && !L.rec) pill('play', 550, vy, 260, 90, L.playing === 'note' ? '■ Stop' : '▶ Play', { size: 40 }, () => playVoice('note', L.voice));
+      wrap(L.recMsg || (L.rec ? 'Recording. Describe what you saw, then press Stop.' : L.voice ? 'Voice note attached.' : 'Say what you saw instead of typing. Written notes can be added in the flat app.'),
+        L.voice && !L.rec ? 840 : 560, vy + 58, L.voice && !L.rec ? PW - 930 : PW - 650, 44, `400 34px ${F.body}`, L.recMsg ? C.warn : C.muted, 2);
+      if (L.saved) text('Saved to your journal.', PW / 2, 1135, `500 40px ${F.body}`, '#7ad7a0', 'center');
+      pill('skip', 90, 1080, 300, 110, L.saved ? 'Done' : L.back === 'journal' ? 'Back' : 'Skip', { size: 44 }, () => { stopVRAudio(); L.view = L.back; L.saved = false; if (L.back === 'journal') openVRJournal(); });
+      if (!L.saved) pill('save', PW - 90 - 560, 1080, 560, 110, 'Save to journal', { primary: true, disabled: !(L.rating || L.tags.size || L.voice) || !!L.rec, size: 50 }, () => saveRating());
+    } else if (L.view === 'journal') {
+      const all = L.jList, rated = all.filter(e => e.rating), per = 3, pages = Math.max(1, Math.ceil(all.length / per));
+      L.jPage = Math.min(L.jPage, pages - 1);
+      text('Journal', 90, 150, `800 88px ${F.disp}`, C.fg);
+      text(all.length ? `${all.length} session${all.length > 1 ? 's' : ''} · ${Math.round(all.reduce((s, e) => s + e.secs, 0) / 60)} min total` +
+        (rated.length ? ` · average visuals ${(rated.reduce((s, e) => s + e.rating, 0) / rated.length).toFixed(1)} / 5` : '') : '', 92, 212, `400 34px ${F.mono}`, C.muted);
+      pill('jback', PW - 90 - 300, 82, 300, 96, 'Back', { size: 44 }, () => { stopVRAudio(); L.view = 'journeys'; });
+      if (!all.length) wrap('No sessions yet. After each session you can rate it, tap what you saw and record a voice note, and it shows up here.', 92, 360, 1500, 56, `400 42px ${F.body}`, C.muted, 3);
+      all.slice(L.jPage * per, L.jPage * per + per).forEach((e, i) => {
+        const x = 90, y = 262 + i * 262, w = PW - 180, hh = 236, tw = w - 68 - 660;
+        rr(x, y, w, hh, 28); cx.fillStyle = C.card; cx.fill(); cx.lineWidth = 3; cx.strokeStyle = C.line; cx.stroke();
+        text(fmtDate(e.date), x + 34, y + 64, `500 44px ${F.body}`, C.fg);
+        if (e.rating) text('★'.repeat(e.rating) + '☆'.repeat(5 - e.rating), x + 34 + tw, y + 64, `400 40px ${F.body}`, C.warn, 'right');
+        ticker(`${fmtDur(e.secs)} · ${e.mode === 'vr' ? 'VR' : 'flat'} · ${describe(e.cfg)}`, x + 34, y + 116, tw, `400 30px ${F.mono}`, C.muted, false, 0);
+        const seen = [e.tags?.length ? 'Saw: ' + e.tags.join(', ') : '', e.note || ''].filter(Boolean).join(' — ');
+        ticker(seen || (e.voice ? 'Voice note' : 'No notes'), x + 34, y + 176, tw, `400 34px ${F.body}`, seen ? C.fg : C.muted, false, 0);
+        const bx = x + w - 34 - 200, by = y + (hh - 84) / 2;
+        pill('juse' + i, bx, by, 200, 84, 'Use', { size: 38 }, () => useEntry(e));
+        pill('jedit' + i, bx - 216, by, 200, 84, 'Edit', { size: 38 }, () => editEntry(e));
+        if (e.voice) pill('jplay' + i, bx - 432, by, 200, 84, L.playing === e.id ? '■ Stop' : '▶ Voice', { size: 38 }, () => playVoice(e.id, e.voice));
+      });
+      if (pages > 1) {
+        pill('jnew', 90, 1080, 300, 100, '‹ Newer', { size: 40, disabled: L.jPage === 0 }, () => { L.jPage--; });
+        text(`${L.jPage + 1} / ${pages}`, PW / 2, 1146, `400 38px ${F.mono}`, C.muted, 'center');
+        pill('jold', PW - 90 - 300, 1080, 300, 100, 'Older ›', { size: 40, disabled: L.jPage >= pages - 1 }, () => { L.jPage++; });
+      }
     }
+  }
+  async function openVRJournal() {
+    L.view = 'journal';
+    L.jList = (await dbAll('sessions')).sort((a, b) => b.id - a.id);
+    panelDirty = true;
+  }
+  function editEntry(e) {
+    stopVRAudio();
+    Object.assign(L, { entry: e, rating: e.rating || 0, tags: new Set(e.tags || []), voice: e.voice || null, recMsg: '', saved: false, back: 'journal', view: 'rating' });
+  }
+  function useEntry(e) {
+    stopVRAudio();
+    const st = STYLE_OF[e.cfg.kind];
+    L.sel = st ? { name: BREATH_STYLES[st].name, breath: st, short: BREATH_STYLES[st].short }
+               : { name: 'From your journal', cfg: { ...e.cfg }, why: `The same settings as your session on ${fmtDate(e.date)}` + (e.rating ? `, rated ${e.rating} out of 5.` : '.') };
+    L.view = 'detail';
+  }
+  let vrStop = null, vrAudio = null;
+  async function vrRecord() {
+    if (L.rec) { vrStop?.(); return; }
+    stopVRAudio(); L.recMsg = '';
+    L.rec = true; L.recSecs = 0; panelDirty = true;
+    vrStop = await startRecording({
+      onTick: s => { L.recSecs = s; panelDirty = true; },
+      onStatus: m => { L.recMsg = m.includes('denied') || m.includes('blocks')
+        ? 'The microphone is blocked. Take the headset off, record one voice note in the flat app to allow it, then try again.' : m; panelDirty = true; },
+      onDone: b => { L.rec = null; vrStop = null; if (b) { L.voice = b; L.saved = false; } panelDirty = true; }
+    });
+    if (!vrStop) { L.rec = null; panelDirty = true; }
+  }
+  function playVoice(id, blob) {
+    if (L.playing === id) { stopVRAudio(); return; }
+    stopVRAudio();
+    vrAudio = new Audio(URL.createObjectURL(blob)); L.playing = id;
+    vrAudio.onended = () => { L.playing = null; vrAudio = null; panelDirty = true; };
+    vrAudio.play().catch(() => { L.playing = null; vrAudio = null; panelDirty = true; });
+  }
+  function stopVRAudio() {
+    if (vrAudio) { try { vrAudio.pause(); } catch {} vrAudio = null; }
+    L.playing = null;
+    if (L.rec) vrStop?.();
   }
   function uploadPanel() {
     drawPanel();
@@ -2938,13 +3059,14 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     done.stopAudio();
     mode = 'fadein'; fade = 0; fadeTarget = 1; placed = false;   // re-center the panel where you are now looking
     const entry = await logEntry(done, reason);
-    L.entry = entry; L.rating = 0; L.saved = false;
+    Object.assign(L, { entry, rating: 0, tags: new Set(), voice: null, recMsg: '', saved: false, back: 'journeys' });
     L.view = entry && entry.secs >= 20 ? 'rating' : 'journeys';
     panelDirty = true;
   }
   async function saveRating() {
-    if (!L.entry || !L.rating) return;
-    L.entry.rating = L.rating; await dbPut('sessions', L.entry); renderHistory();
+    if (!L.entry || !(L.rating || L.tags.size || L.voice)) return;
+    Object.assign(L.entry, { rating: L.rating, tags: [...L.tags], voice: L.voice });
+    await dbPut('sessions', L.entry); renderHistory();
     L.saved = true; panelDirty = true;
   }
   function exit() { try { xr?.end(); } catch {} }
@@ -2999,6 +3121,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     xr.addEventListener('inputsourceschange', () => sources.clear());
     xr.addEventListener('end', () => {
       if (amb) { amb.stop(); amb = null; }
+      stopVRAudio();
       if (S) { const s = S; S = null; s.stopAudio(); logEntry(s, 'stopped'); }
       xr = null; xrSession = null; running = false;
       setTimeout(() => { try { sharedAudioCtx?.close(); } catch {} sharedAudioCtx = null; }, 600);
@@ -3075,12 +3198,13 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   }
 
   // Desktop preview, used for testing on a flat screen: renders one still view of a room.
-  function preview(canvas, id, { yaw = 0, pitch = 0, view = 'journeys', panel = true, t = 3, tab = null, hover = null, hoverAgo = 0 } = {}) {
+  function preview(canvas, id, { yaw = 0, pitch = 0, view = 'journeys', panel = true, t = 3, tab = null, hover = null, hoverAgo = 0, lset = null } = {}) {
     if (tab) L.tab = tab;
     hovered = new Set(hover ? [hover] : []); if (hover) hoverSince.set(hover, performance.now() - hoverAgo);
     const g = canvas.getContext('webgl2', { antialias: true }) || canvas.getContext('webgl');
     init(g); roomId = id; bake(roomOf(id));
     L.view = view; if (view === 'detail') L.sel = journeys()[1];
+    if (lset) Object.assign(L, lset);
     const eye = [0, 1.6, 0];
     const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
     // camera: rotate yaw (around Y) then pitch (around X)
