@@ -197,6 +197,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <p class="note" id="lobbyNote">Sit under a starlit sky, by a lake at dusk, in deep space or in a quiet void. Choose a journey, start it and rate it, all inside the headset.</p>
       </div>
       <button class="go" id="enterLobby" type="button">Enter VR</button>
+      <p class="note" id="micRow" hidden><button class="linkbtn" id="micAllow" type="button">Allow the microphone</button> so you can record voice notes in VR. The headset can only ask for it outside VR.</p>
     </div>
     <div class="seg tabs" role="tablist" aria-label="Journey type">
       <button type="button" role="tab" data-hometab="flicker">Flicker</button>
@@ -1270,12 +1271,32 @@ function micError(e) {
     NotReadableError: 'The microphone is busy in another app.'
   }[e?.name]) || 'Couldn\'t start the microphone' + (e ? ` (${e.name})` : '') + '.';
 }
+// Microphone permission, checked without prompting. In VR the headset has to leave the session to show its prompt,
+// so the lobby only records when this says 'granted'; the flat app asks for it instead.
+async function micPermission() {
+  try { return (await navigator.permissions.query({ name: 'microphone' })).state; }
+  catch { try { return localStorage.getItem('gf-mic-ok') ? 'granted' : 'unknown'; } catch { return 'unknown'; } }
+}
+async function refreshMicRow() {
+  const row = $('#micRow'); if (!row) return;
+  row.hidden = !navigator.xr || !navigator.mediaDevices?.getUserMedia || (await micPermission()) === 'granted';
+}
+$('#micAllow')?.addEventListener('click', async () => {
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop());
+    try { localStorage.setItem('gf-mic-ok', '1'); } catch {}
+    toast('Microphone allowed. You can record voice notes in VR now.');
+  } catch (e) { toast(micError(e)); }
+  refreshMicRow();
+});
+refreshMicRow(); addEventListener('focus', refreshMicRow);
 // Starts recording right away. Returns a stop() function, or null if the microphone couldn't start (onStatus gets the reason).
 async function startRecording({ onTick, onDone, onStatus, maxSecs = 180 }) {
   let stream, rec;
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw null;
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    try { localStorage.setItem('gf-mic-ok', '1'); } catch {}
   } catch (e) { onStatus(micError(e)); return null; }
   try { rec = new MediaRecorder(stream); } catch { stream.getTracks().forEach(t => t.stop()); onStatus('This browser can\'t record audio.'); return null; }
   const chunks = []; let secs = 0;
@@ -2765,6 +2786,14 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   async function vrRecord() {
     if (L.rec) { vrStop?.(); return; }
     stopVRAudio(); L.recMsg = '';
+    // Never trigger the permission prompt from inside VR: on Quest it drops you out of the headset view.
+    const perm = await micPermission();
+    if (perm !== 'granted') {
+      L.recMsg = perm === 'denied'
+        ? 'The microphone is blocked for this site. Allow it in the browser\'s site settings, then come back.'
+        : 'Voice notes need the microphone allowed first. Save your rating first, then exit VR and tap "Allow the microphone" under Enter VR. After that, voice notes work in here.';
+      panelDirty = true; return;
+    }
     L.rec = true; L.recSecs = 0; panelDirty = true;
     vrStop = await startRecording({
       onTick: s => { L.recSecs = s; panelDirty = true; },
