@@ -196,6 +196,10 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
       </div>
       <button class="go" id="enterLobby" type="button">Enter VR</button>
     </div>
+    <button class="rset" data-go="breathwork" type="button">
+      <b>Breath journey <span id="hbHomeMeta"></span></b>
+      <small>Faster, deeper connected breathing to music that builds to a peak, then a slow return to stillness. Inspired by holotropic breathwork. Safety check first.</small>
+    </button>
     <div class="modebar">
       <div class="seg" role="group" aria-label="Settings mode">
         <button type="button" data-mode="basic">Basic</button>
@@ -642,6 +646,50 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
     </div>
   </section>
 
+
+  <section class="screen" data-screen="breathwork" hidden aria-labelledby="h-bw">
+    <div class="screen-head">
+      <p class="eyebrow">Breath journey</p>
+      <h2 id="h-bw">Breathe your way in</h2>
+      <p class="note">Inspired by holotropic breathwork, developed by Stanislav and Christina Grof. You lie down with your eyes closed and breathe faster and deeper than usual, with no pause between breaths, while the music builds to a peak. Then the music softens and you return to natural breathing.</p>
+    </div>
+    <section class="warning" aria-labelledby="hb-warn">
+      <h2 id="hb-warn">Safety check</h2>
+      <p>Don't do this if you have heart disease, angina, high blood pressure or a past heart attack; glaucoma or retinal detachment; osteoporosis; epilepsy or any seizure disorder; a family history of aneurysm; a recent injury or surgery; or a history of psychosis, panic attacks or severe mental illness. Don't do it while pregnant or breastfeeding. Ask a doctor first if you take regular medication or have asthma.</p>
+      <p>Fast breathing often causes tingling, light-headedness or cramping in the hands and face. Slowing down eases it. Stop and breathe normally if you feel chest pain, faintness or overwhelming distress. Always lie down, never stand, drive or be near water. It can bring up strong emotions, so have someone sit with you, and consider a trained facilitator, especially the first time.</p>
+      <label class="consent"><input type="checkbox" id="hbAck"> I've read this, none of it applies to me, and I'll lie down for the session.</label>
+    </section>
+    <div class="controls">
+      <div class="row">
+        <label for="hbMin">Breathing time <output id="hbMinOut"></output></label>
+        <input type="range" id="hbMin" data-jkey="hbMin" min="10" max="45" step="5">
+      </div>
+      <div class="row">
+        <label for="hbPace">Breath pace <output id="hbPaceOut"></output></label>
+        <input type="range" id="hbPace" data-jkey="hbPace" min="3" max="6" step="0.5">
+        <p class="note">The glowing symbol and an airy sound pace your breathing for the first 4 minutes, then fade so you can find your own rhythm.</p>
+      </div>
+      <div class="row">
+        <label for="hbVol">Music volume <output id="hbVolOut"></output></label>
+        <input type="range" id="hbVol" data-jkey="hbVol" min="10" max="100" step="5">
+      </div>
+      <label class="toggle"><input type="checkbox" id="hbDrums" data-jkey="hbDrums"> Drumming during the breathing</label>
+      <label class="toggle"><input type="checkbox" id="hbLight" data-jkey="hbLight"> Add gentle flicker afterwards</label>
+      <div class="sub" id="hbLightRows">
+        <p class="note">Fast breathing and flashing light are both used in hospitals to trigger seizures during brain tests, so they are never combined here. The flicker starts only after 7 minutes of normal breathing, at 10 Hz and low brightness.</p>
+        <div class="row">
+          <label for="hbLightMin">Flicker time <output id="hbLightMinOut"></output></label>
+          <input type="range" id="hbLightMin" data-jkey="hbLightMin" min="5" max="20" step="5">
+        </div>
+      </div>
+    </div>
+    <p class="plan" id="hbPlan"></p>
+    <p class="note" id="hbNote"></p>
+    <div class="foot">
+      <button class="go secondary" id="hbFS" type="button" disabled>Fullscreen</button>
+      <button class="go" id="hbVR" type="button" disabled>Start in VR</button>
+    </div>
+  </section>
   <section class="screen" data-screen="journal" hidden aria-labelledby="h-journal">
     <div class="screen-head">
       <h2 id="h-journal">Session journal</h2>
@@ -751,6 +799,7 @@ function fmtMinSec(s) { const m = Math.floor(s / 60), r = Math.round(s % 60); re
 const parseV = v => (v !== '' && !isNaN(v)) ? Number(v) : v;
 
 function describe(c, withBreath = true) {
+  if (c.kind === 'breath') return `Breath journey · ${c.hbMin} min breathing · ${Math.round(60 / c.hbPace)} breaths a minute` + (c.hbLight ? ` · ${c.hbLightMin} min flicker after` : '');
   const parts = [];
   if (withBreath && c.breathOn) parts.push('breath intro');
   parts.push(c.rhythm === 'glide' ? `${c.gStart}→${c.gEnd} Hz over ${c.gMin} min` : `${c.hz} Hz`);
@@ -973,7 +1022,11 @@ $('#agree').addEventListener('click', () => { if (consent.checked) { backStack.l
 
 // ================= Presets =================
 function loadCfg(cfg, label) {
-  Object.assign(state, DEFAULTS, cfg);
+  if (cfg.kind === 'breath') {
+    Object.keys(JOURNEY_DEFAULTS).forEach(k => { if (k in cfg) journey[k] = cfg[k]; });
+    store.set('gf-journey', journey); syncJourney(); go('breathwork'); return;
+  }
+  Object.assign(state, DEFAULTS, cfg); delete state.kind;
   changed();
   $('#readyFrom').textContent = label ? 'Journey · ' + label : 'Settings from your journal';
   go('ready');
@@ -1264,24 +1317,46 @@ let sharedAudioCtx = null;
 
 // ================= Session engine =================
 // One timeline drives light, tones, background, affirmation and the ending, for both VR and fullscreen.
-function createSession(mode) {
-  const cfg = { ...state };
-  const total = cfg.mins * 60;
-  const W = Math.min(90, total * 0.3);           // wake-up window
+function createSession(mode, override) {
+  const cfg = override ? { ...DEFAULTS, ...override } : { ...state };
+  // Breath journey: settle, then faster connected breathing to a building music arc, then a slow return.
+  // Optional flicker afterwards only once breathing has been normal for 7 minutes (fast breathing and
+  // flashing light are both clinical seizure triggers, so they are never combined).
+  const J = cfg.kind === 'breath';
+  const JA = 180, JB = (cfg.hbMin || 20) * 60, JR = 420;
+  const total = J ? (cfg.hbLight ? cfg.hbLightMin * 60 : 0) : cfg.mins * 60;
+  const W = Math.max(1, Math.min(90, total * 0.3));   // wake-up window
   const sleepLen = cfg.sleepMin * 60;
   const flashRGB = hexRGB(cfg.flash), offRGB = hexRGB(cfg.off), splitRGB = hexRGB(cfg.splitColor), dotRGB = hexRGB(cfg.dotColor);
   const pal = PALETTES[cfg.palette].colors.map(hexRGB);
   let phase = 0, last = null, start = null, chimed = false;
   // Fourfold breath intro: B seconds of guided breathing before the flicker, then EASE seconds of crossfade.
   const step = cfg.breathSec, cycle = 4 * step;
-  const B = cfg.breathOn ? cfg.breathRounds * cycle : 0;
-  const EASE = cfg.breathOn ? 2 * cycle : 0;
+  const B = J ? JA + JB + JR : (cfg.breathOn ? cfg.breathRounds * cycle : 0);
+  const EASE = Math.max(1, J ? 60 : (cfg.breathOn ? 2 * cycle : 0));
   const S = { cfg, mode, t: 0, T: 0, total: B + total, done: false, startedAt: new Date() };
   const ease = f => f * f * (3 - 2 * f);
   // 0..1 breath shape: in (rise), hold full, out (fall), hold empty.
   function breathShape(T) {
     const p = (T % cycle) / step, i = Math.floor(p), f = p - i;
     return [ease(f), 1, 1 - ease(f), 0][i];
+  }
+  // Breath journey phases. guide = how visible the sun-symbol pacer is; bshape = its fill; I = music intensity.
+  const arc = x => x < 0.65 ? ease(clamp01(x / 0.65)) : x < 0.8 ? 1 : 1 - 0.85 * ease(clamp01((x - 0.8) / 0.2));
+  function journeyAt(T) {
+    if (T < JA) return { phase: 'arrive', guide: 0.75, bshape: 0.5 - 0.5 * Math.cos(2 * Math.PI * T / 6), I: 0, x: 0, u: T, pacer: 0.6, peak: 0 };
+    if (T < JA + JB) {
+      const u = T - JA, x = u / JB;
+      const pacer = 1 - clamp01((u - 240) / 120);   // paces clearly for 4 minutes, then fades so you find your own rhythm
+      return { phase: 'breathe', guide: 0.22 + 0.78 * pacer, bshape: 0.5 - 0.5 * Math.cos(2 * Math.PI * u / (cfg.hbPace || 4)),
+               I: arc(x), x, u, pacer, peak: clamp01(1 - Math.abs(x - 0.72) / 0.1) };
+    }
+    if (T < B) {
+      const u = T - JA - JB;
+      return { phase: 'return', guide: 0.12 + 0.3 * (1 - clamp01(u / 90)), bshape: (0.5 - 0.5 * Math.cos(2 * Math.PI * u / 8)) * (1 - clamp01(u / 60)),
+               I: 0, x: 1, u, pacer: 0, peak: 0 };
+    }
+    return { phase: 'after', guide: 0.12 * (1 - ease(clamp01((T - B) / EASE))), bshape: 0, I: 0, x: 1, u: T - B, pacer: 0, peak: 0 };
   }
 
   // ---- audio graph (built inside the Start tap so the browser allows it) ----
@@ -1320,6 +1395,26 @@ function createSession(mode) {
         buildBackground(ctx, cfg.bg, out);
       }
       if (cfg.drumOn) { A.drum = ctx.createGain(); A.drum.gain.value = 0; A.drum.connect(A.master); A.onsets = 0; A.prevOn = false; }
+      if (J) {
+        // Journey music, all synthesized: a drone bed, a frame drum, a bright "breakthrough" chord for the peak,
+        // a warm "heart" chord for the return, an airy breath sound that paces the breathing, and soft bells.
+        A.jVol = (cfg.hbVol ?? 70) / 100;
+        A.jDrone = ctx.createGain(); A.jDrone.gain.value = 0; A.jDrone.connect(A.master); buildBackground(ctx, 'drone', A.jDrone);
+        A.jPeakF = ctx.createBiquadFilter(); A.jPeakF.type = 'lowpass'; A.jPeakF.frequency.value = 300; A.jPeakF.Q.value = 1;
+        A.jPeak = ctx.createGain(); A.jPeak.gain.value = 0; A.jPeakF.connect(A.jPeak).connect(A.master);
+        [110, 164.81, 220, 277.18, 329.63].forEach((f, i) => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = i % 2 ? 7 : -7;
+          const g = ctx.createGain(); g.gain.value = 0.045; o.connect(g).connect(A.jPeakF); o.start(); });
+        A.jHeart = ctx.createGain(); A.jHeart.gain.value = 0; A.jHeart.connect(A.master);
+        [130.81, 164.81, 196, 261.63, 329.63].forEach((f, i) => { const o = ctx.createOscillator(); o.frequency.value = f;
+          const g = ctx.createGain(); g.gain.value = [0.35, 0.25, 0.25, 0.18, 0.1][i]; o.connect(g).connect(A.jHeart); o.start(); });
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.7;
+        A.jAir = ctx.createGain(); A.jAir.gain.value = 0; bp.connect(A.jAir).connect(A.master);
+        const air = ctx.createBufferSource(); air.buffer = loopBuffer(ctx, 6, d => { const g = pinkGen(); for (let i = 0; i < d.length; i++) d[i] = g(); }, 2);
+        air.loop = true; air.connect(bp); air.start();
+        A.jDrum = ctx.createGain(); A.jDrum.gain.value = 0; A.jDrum.connect(A.master);
+        A.jBellG = ctx.createGain(); A.jBellG.gain.value = 0.35; A.jBellG.connect(A.master);
+        A.jNext = null; A.jBell = 0;
+      }
       if (cfg.breathOn) {
         // Breath guide: a soft two-note pad that swells with the inhale and a quiet chime at each new breath.
         A.breath = ctx.createGain(); A.breath.gain.value = 0;
@@ -1383,8 +1478,10 @@ function createSession(mode) {
     const endLight = cfg.ending === 'wake' ? (total - t) / W : cfg.ending === 'sleep' ? (total - t) / 20 : (total - t) / 4;
     const light = t < 0 || t >= total ? 0 : clamp01(fadeIn) * clamp01(endLight);
     // Breath guide level: full during the intro, fading out over the crossfade.
-    const guide = B ? (t < 0 ? 1 : 1 - ease(clamp01(t / EASE))) : 0;
-    const bshape = guide > 0 ? breathShape(T) : 0;
+    let guide = B ? (t < 0 ? 1 : 1 - ease(clamp01(t / EASE))) : 0;
+    let bshape = guide > 0 ? breathShape(T) : 0;
+    const jx = J ? journeyAt(T) : null;
+    if (jx) { guide = jx.guide; bshape = jx.bshape; }
     // Background sounds start with the breath; tones and drum come in with the flicker.
     const flickerIn = B ? ease(clamp01(t / EASE)) : 1;
     let sound = Math.min(1, T / 4);
@@ -1405,6 +1502,23 @@ function createSession(mode) {
         A.lastStep = stepIdx;
       }
       ramp(A.bg.gain, cfg.bgVol / 100 * sound, at, 0.08);
+      if (jx && A.jDrone) {
+        const v = A.jVol * sound, ph = jx.phase;
+        const drone = ph === 'arrive' ? 0.35 : ph === 'breathe' ? 0.3 + 0.7 * jx.I : ph === 'return' ? 0.15 + 0.45 * (1 - clamp01(jx.u / JR)) : 0.08;
+        ramp(A.jDrone.gain, drone * 0.9 * v, at, 0.6);
+        ramp(A.jPeak.gain, (ph === 'breathe' ? jx.peak : 0) * 0.5 * v, at, 0.8);
+        ramp(A.jPeakF.frequency, 300 + 2400 * (ph === 'breathe' ? jx.peak : 0), at, 0.8);
+        const heart = ph === 'breathe' ? clamp01((jx.x - 0.8) / 0.2) * 0.6 : ph === 'return' ? 0.15 + 0.6 * (1 - clamp01((jx.u - 120) / (JR - 120))) : 0;
+        ramp(A.jHeart.gain, heart * 0.32 * v, at, 1.2);
+        ramp(A.jAir.gain, jx.pacer * bshape * 0.22 * v, at, 0.08);
+        const drum = ph === 'breathe' && cfg.hbDrums !== false ? clamp01(jx.x / 0.04) * (0.25 + 0.75 * jx.I) : 0;
+        ramp(A.jDrum.gain, drum * 0.8 * v, at, 0.3);
+        if (drum > 0.01) {
+          if (A.jNext == null || A.jNext < at) A.jNext = at + 0.05;
+          while (A.jNext < at + 0.12) { drumHit(A.ctx, A.jDrum, A.jNext, 0.8 + Math.random() * 0.2); A.jNext += (1 / (2 + 1.6 * jx.I)) * (1 + (Math.random() - 0.5) * 0.03); }
+        } else A.jNext = null;
+        if (ph === 'return' && jx.u > 60 && T >= A.jBell) { chime(A.ctx, A.jBellG, at + 0.05, [528, 396, 440][Math.floor(Math.random() * 3)]); A.jBell = T + 22 + Math.random() * 8; }
+      }
       if (A.isoGate) ramp(A.isoGate.gain, on && t < total + (cfg.ending === 'sleep' ? sleepLen : 0) ? 1 : 0, at, 0.004);
       if (A.binR) ramp(A.binR.frequency, cfg.pitch + hz, at, 0.05);
       if (cfg.affFade) ramp(A.aff.gain, cfg.affVol / 100 * (1 - 0.8 * clamp01(t / total)), at, 0.2);
@@ -1463,6 +1577,7 @@ function createSession(mode) {
       pattern: { full: 0, spiral: 1, rings: 2, tunnel: 3 }[cfg.pattern], ptime: t * cfg.pspeed
     };
   };
+  S.audio = A;   // exposed for testing
   S.stopAudio = () => {
     if (!A.ctx) return;
     try { A.master.gain.setTargetAtTime(0, A.ctx.currentTime, 0.08); } catch {}
@@ -1569,7 +1684,7 @@ function makeRefreshMeter() {
 // ================= Fullscreen mode =================
 const stage = $('#stage'), fsCanvas = $('#fsCanvas');
 let fsGL = null, fsR = null, raf = 0, fsSession = null, running = false, xrSession = null;
-function startFS() {
+function startFS(override) {
   if (running) return;
   try { stage.requestFullscreen?.().catch(() => {}); } catch {}
   stage.hidden = false;
@@ -1577,7 +1692,7 @@ function startFS() {
     if (!fsGL) { fsGL = fsCanvas.getContext('webgl'); fsR = makeRenderer(fsGL); }
   } catch (e) { stage.hidden = true; toast('This browser can\'t draw the flicker: ' + e.message); return; }
   running = true;
-  const S = fsSession = createSession('fullscreen');
+  const S = fsSession = createSession('fullscreen', override);
   navigator.wakeLock?.request('screen').then(l => S.lock = l).catch(() => {});
   const meter = makeRefreshMeter();
   const loop = now => {
@@ -1604,7 +1719,7 @@ stage.addEventListener('pointerdown', () => stopFS());
 window.addEventListener('keydown', () => fsSession && stopFS());
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && fsSession) stopFS(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && fsSession) stopFS(); });
-$('#startFS').addEventListener('click', startFS);
+$('#startFS').addEventListener('click', () => startFS());
 
 // ================= VR mode =================
 (async () => {
@@ -1618,13 +1733,14 @@ $('#startFS').addEventListener('click', startFS);
   syncButtons();
 })();
 
-$('#startVR').addEventListener('click', async () => {
+$('#startVR').addEventListener('click', () => startVR());
+async function startVR(override) {
   if (running) return;
   // Ask for VR first thing in the tap, before any other work, so the headset counts it as a direct tap.
   let request;
   try { request = navigator.xr.requestSession('immersive-vr'); } catch (e) { request = Promise.reject(e); }
   let S = null;
-  try { S = createSession('vr'); } catch {}
+  try { S = createSession('vr', override); } catch {}
   let session;
   try { session = await request; }
   catch (e) {
@@ -1701,7 +1817,7 @@ $('#startVR').addEventListener('click', async () => {
       session.updateTargetFrameRate(want).catch(() => {});
     }
   } catch {}
-});
+}
 
 // ================= Journal & history =================
 let journalEntry = null, jRating = 0, jVoice = null;
@@ -1797,6 +1913,41 @@ async function renderHistory() {
     card.append(acts); box.append(card);
   });
 }
+
+
+// ================= Breath journey =================
+const JOURNEY_DEFAULTS = { hbMin: 20, hbPace: 4, hbLight: false, hbLightMin: 10, hbDrums: true, hbVol: 70 };
+const journey = Object.assign({}, JOURNEY_DEFAULTS, store.get('gf-journey') || {});
+// The full session config for a journey: the breathing settings plus a gentle, fixed flicker for the optional ending.
+function journeyCfg() {
+  return { ...journey, kind: 'breath', breathOn: false, rhythm: 'steady', hz: 10, lock: true, drift: false, flash: '#ff991a', off: '#000000',
+           bright: 45, cj: false, pattern: 'full', split: 'both', dot: false, iso: false, bin: false, bgOn: false, drumOn: false, affOn: false, ending: 'wake' };
+}
+function journeyMinutes(j = journey) { return 3 + j.hbMin + 7 + (j.hbLight ? j.hbLightMin : 0); }
+const hbAckOk = () => { const t = store.get('gf-hb-ack'); return !!t && Date.now() - t < 30 * 864e5; };
+function syncJourney() {
+  $$('[data-jkey]').forEach(el => { const k = el.dataset.jkey; if (el.type === 'checkbox') el.checked = !!journey[k]; else el.value = journey[k]; });
+  $('#hbMinOut').textContent = journey.hbMin + ' min';
+  $('#hbPaceOut').textContent = `${journey.hbPace} s per breath · ${Math.round(60 / journey.hbPace)} a minute`;
+  $('#hbVolOut').textContent = journey.hbVol + '%';
+  $('#hbLightMinOut').textContent = journey.hbLightMin + ' min';
+  $('#hbLightRows').hidden = !journey.hbLight;
+  $('#hbPlan').textContent = `3 min settling · ${journey.hbMin} min breathing · 7 min return to natural breathing` + (journey.hbLight ? ` · ${journey.hbLightMin} min gentle flicker` : '') + ` · about ${journeyMinutes()} min`;
+  $('#hbHomeMeta').textContent = `~${journeyMinutes()} min`;
+  const ok = $('#hbAck').checked;
+  $('#hbFS').disabled = !ok; $('#hbVR').disabled = !ok || !navigator.xr;
+  $('#hbNote').textContent = ok ? 'Press start, then lie down and close your eyes. In VR, pull the trigger to stop; in fullscreen, tap the screen.' : 'Tick the safety check to start.';
+}
+document.addEventListener('input', e => {
+  const k = e.target.dataset?.jkey; if (!k) return;
+  journey[k] = e.target.type === 'checkbox' ? e.target.checked : +e.target.value;
+  store.set('gf-journey', journey); syncJourney();
+});
+$('#hbAck').checked = hbAckOk();
+$('#hbAck').addEventListener('change', e => { store.set('gf-hb-ack', e.target.checked ? Date.now() : 0); syncJourney(); });
+$('#hbFS').addEventListener('click', () => startFS(journeyCfg()));
+$('#hbVR').addEventListener('click', () => startVR(journeyCfg()));
+syncJourney();
 
 // ================= Boot =================
 renderPresets();
@@ -2110,10 +2261,11 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     }, disabled ? null : onClick);
   }
 
-  const L = { view: 'journeys', sel: null, rating: 0, entry: null, saved: false };
+  const L = { view: 'journeys', sel: null, rating: 0, entry: null, saved: false, override: null };
   function journeys() {
     const list = [{ name: 'Your setup', cfg: null, short: 'Your current settings from the flat screen.' }]
-      .concat(RESEARCH.map(r => ({ name: r.name, cfg: r.cfg, short: SHORT[r.name] || '', caution: r.caution })));
+      .concat(RESEARCH.map(r => ({ name: r.name, cfg: r.cfg, short: SHORT[r.name] || '', caution: r.caution })))
+      .concat([{ name: 'Breath journey', journey: true, short: 'Connected breathing to a building music arc.' }]);
     return list;
   }
   function metaOf(cfg) {
@@ -2142,7 +2294,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
           rr(x, y, cw, ch, 28); cx.fillStyle = hi ? C.cardHi : C.card; cx.fill();
           cx.lineWidth = 3; cx.strokeStyle = hi ? C.accent : C.line; cx.stroke();
           text(it.name, x + 34, y + 68, `500 46px ${F.body}`, C.fg);
-          text(metaOf(it.cfg), x + 34, y + 116, `400 32px ${F.mono}`, C.muted);
+          text(it.journey ? `breathwork · ~${journeyMinutes()} min` : metaOf(it.cfg), x + 34, y + 116, `400 32px ${F.mono}`, C.muted);
           wrap(it.short, x + 34, y + 166, cw - 68, 40, `400 33px ${F.body}`, it.caution ? C.warn : C.muted, 1);
         }, () => { L.sel = it; L.view = 'detail'; panelDirty = true; });
       });
@@ -2159,6 +2311,18 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
         ambOn = !ambOn; try { localStorage.setItem('gf-amb', ambOn ? 'on' : 'off'); } catch {} panelDirty = true;
       });
       pill('exit', PW - 90 - 260, by, 260, 80, 'Exit VR', { size: 38 }, () => exit());
+    } else if (L.view === 'detail' && L.sel.journey) {
+      const ok = hbAckOk();
+      text('BREATH JOURNEY', 92, 120, `400 32px ${F.mono}`, C.accent);
+      text('Breathe your way in', 90, 220, `800 96px ${F.disp}`, C.fg);
+      text(`~${journeyMinutes()} min · ${roomOf(roomId).name}`, 92, 290, `400 38px ${F.mono}`, C.muted);
+      const n = wrap('Faster, deeper breathing with no pause between breaths, while the music builds to a peak. Then the music softens and you return to natural breathing. Inspired by holotropic breathwork.', 92, 380, 1500, 60, `400 44px ${F.body}`, C.fg, 4);
+      wrap(describe(journeyCfg()), 92, 400 + n * 60 + 30, 1500, 46, `400 32px ${F.mono}`, C.muted, 2);
+      rr(90, 830, 1860, 150, 24); cx.fillStyle = 'rgba(255,179,71,0.08)'; cx.fill(); cx.strokeStyle = 'rgba(255,179,71,0.5)'; cx.lineWidth = 3; cx.stroke();
+      wrap(ok ? 'Press Begin, then lie down and close your eyes. If you feel chest pain or faint, stop and breathe normally. Pull the trigger at any time to stop.'
+              : 'Complete the safety check first: open Breath journey on the home screen of the flat app.', 130, 890, 1780, 46, `400 36px ${F.body}`, C.warn, 2);
+      pill('back', 90, 1060, 300, 120, 'Back', { size: 44 }, () => { L.view = 'journeys'; panelDirty = true; });
+      pill('begin', PW - 90 - 640, 1060, 640, 120, 'Begin', { primary: true, disabled: !ok, size: 54 }, () => begin());
     } else if (L.view === 'detail') {
       const it = L.sel, cfg = { ...DEFAULTS, ...(it.cfg || state) };
       text('JOURNEY', 92, 120, `400 32px ${F.mono}`, C.accent);
@@ -2455,8 +2619,8 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     if (xr) startAmbience();
   }
   function begin() {
-    if (L.sel.cfg) Object.assign(state, DEFAULTS, L.sel.cfg);
-    changed();
+    if (L.sel.journey) { if (!hbAckOk()) return; L.override = journeyCfg(); }
+    else { L.override = null; if (L.sel.cfg) { Object.assign(state, DEFAULTS, L.sel.cfg); delete state.kind; } changed(); }
     mode = 'fadeout'; fadeTarget = 0;
   }
   async function finish(reason) {
@@ -2546,7 +2710,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     // Fades: room out before a session, back in after.
     const speed = mode === 'fadeout' ? 1 / 2.5 : 1 / 3;
     fade += Math.sign(fadeTarget - fade) * Math.min(Math.abs(fadeTarget - fade), dt * speed);
-    if (mode === 'fadeout' && fade <= 0.001) { S = createSession('vr'); mode = 'running'; }
+    if (mode === 'fadeout' && fade <= 0.001) { S = createSession('vr', L.override); mode = 'running'; }
     if (mode === 'fadein' && fade >= 0.999) mode = 'menu';
     const showPanel = mode === 'menu' || mode === 'fadein';
     if (amb && sharedAudioCtx) {
