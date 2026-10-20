@@ -579,7 +579,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
     <div class="controls">
       <label class="toggle"><input type="checkbox" data-key="breathOn"> Begin with the fourfold breath</label>
       <div class="sub" id="breathRows">
-        <p class="note">Before the flicker, a soft glow and tone guide your breathing: the light brightens and the tone rises as you breathe in, both hold, they fade as you breathe out, then hold in the dark. A small chime marks each new breath. Then the flicker fades in while the guide fades away over two more breaths.</p>
+        <p class="note">Before the flicker, a glowing sun symbol (a circle with a dot in the middle) and a soft tone guide your breathing: the dot swells until the whole circle fills with light as you breathe in, holds, shrinks back to a small dot as you breathe out, then holds. A small chime marks each new breath. Then the flicker fades in while the guide fades away over two more breaths.</p>
         <div class="row">
           <label for="breathRounds">Guided breaths <output data-for="breathRounds"></output></label>
           <input type="range" id="breathRounds" data-key="breathRounds" min="2" max="15" step="1">
@@ -1445,18 +1445,20 @@ function createSession(mode) {
     // ---- colors for this frame ----
     const k = cfg.bright / 100 * light;
     // Breath glow: a steady, non-flickering light in the flash color that rises and falls with the breath.
-    const gk = guide * (0.05 + 0.95 * bshape) * 0.45 * cfg.bright / 100;
-    const glow = flashAt(0).map(v => v * gk);
-    const fl = flashAt(Math.max(0, t)).map((v, i) => v * k + glow[i]), of = offRGB.map((v, i) => v * k + glow[i]);
+    // Breath guide: the sun symbol (a ring with a center dot) drawn by the renderer; no full-field glow.
+    const symK = Math.max(cfg.bright / 100, 0.55);
+    const sym = guide > 0.001 ? { col: flashAt(0).map(v => v * symK), b: bshape, g: guide } : null;
+    const fl = flashAt(Math.max(0, t)).map(v => v * k), of = offRGB.map(v => v * k);
     const dotShown = cfg.dot && light > 0 && (cfg.dotMode === 'steady' || (cfg.dotMode === 'with') === on);
     const dk = Math.max(cfg.bright / 100, 0.3) * Math.max(light, 0.3);
     return {
       t, hz, on, light,
       eye(i) {
         const eOn = cfg.split === 'alt' && i === 1 ? !on : on;
-        const eFl = cfg.split === 'colors' && i === 1 ? splitRGB.map((v, j) => v * k + glow[j]) : fl;
+        const eFl = cfg.split === 'colors' && i === 1 ? splitRGB.map(v => v * k) : fl;
         return { on: eOn, flash: eFl, off: of };
       },
+      sym,
       dot: dotShown ? { rgb: dotRGB.map(v => v * dk), deg: cfg.dotSize } : null,
       pattern: { full: 0, spiral: 1, rings: 2, tunnel: 3 }[cfg.pattern], ptime: t * cfg.pspeed
     };
@@ -1482,6 +1484,7 @@ uniform vec2 uC; uniform float uPPR;
 uniform vec3 uFlash, uOff; uniform float uOn;
 uniform int uPat; uniform float uT;
 uniform vec3 uDotCol; uniform float uDotR; uniform float uDotA;
+uniform vec3 uSymCol; uniform float uBreath; uniform float uGuide;
 const float TAU = 6.2831853;
 void main(){
   vec2 q = (gl_FragCoord.xy - uC) / uPPR;
@@ -1499,6 +1502,18 @@ void main(){
     float d = length(gl_FragCoord.xy - uC);
     col = mix(col, uDotCol, 1.0 - smoothstep(uDotR - 0.75, uDotR + 0.75, d));
   }
+  if (uGuide > 0.001) {
+    // Sun symbol: ring of radius R (radians of view) with a dot that grows to fill it on the in-breath.
+    float a = length(gl_FragCoord.xy - uC) / uPPR;
+    float R = 0.16;
+    float aa = 1.5 / uPPR;                                     // about one pixel, for smooth edges
+    float ring = 1.0 - smoothstep(0.0045, 0.0045 + aa * 2.0, abs(a - R));
+    float rDot = mix(0.022, R, uBreath);
+    float fill = 1.0 - smoothstep(rDot - aa, rDot + aa, a);
+    float core = fill * (0.62 + 0.38 * (1.0 - clamp(a / max(rDot, 0.001), 0.0, 1.0)));
+    float halo = exp(-pow(max(a - R, 0.0) * 12.0, 2.0)) * 0.35 * uBreath + exp(-pow(max(a - rDot, 0.0) * 40.0, 2.0)) * 0.25 * (1.0 - fill);
+    col += uSymCol * (ring * 0.9 + core * (0.85 + 0.45 * uBreath) + halo) * uGuide;
+  }
   gl_FragColor = vec4(col, 1.0);
 }`;
 function makeRenderer(gl) {
@@ -1512,7 +1527,7 @@ function makeRenderer(gl) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
   const loc = n => gl.getUniformLocation(pr, n);
-  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA'].map(n => [n, loc(n)]));
+  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide'].map(n => [n, loc(n)]));
   const aP = gl.getAttribLocation(pr, 'p');
   return {
     // Draw one eye (or the whole screen) into the given viewport.
@@ -1529,6 +1544,8 @@ function makeRenderer(gl) {
         gl.uniform1f(U.uDotA, 1); gl.uniform3fv(U.uDotCol, F.dot.rgb);
         gl.uniform1f(U.uDotR, Math.max(1.5, Math.tan(F.dot.deg * Math.PI / 360) * ppr));
       } else gl.uniform1f(U.uDotA, 0);
+      if (F.sym) { gl.uniform3fv(U.uSymCol, F.sym.col); gl.uniform1f(U.uBreath, F.sym.b); gl.uniform1f(U.uGuide, F.sym.g); }
+      else gl.uniform1f(U.uGuide, 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
   };
