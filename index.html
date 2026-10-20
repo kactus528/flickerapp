@@ -359,6 +359,8 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
 
       <label class="toggle"><input type="checkbox" data-key="drift"> Slow drift (wanders ±1 Hz around the rate)</label>
 
+      <label class="toggle"><input type="checkbox" data-key="hzShow"> Show the current rate on screen (small, below center, so you can open your eyes and read it)</label>
+
       <label class="toggle"><input type="checkbox" data-key="lock"> Lock to the screen's refresh rate (every flash exactly the same length)</label>
       <div class="sub" id="lockRows">
         <div class="row">
@@ -820,7 +822,7 @@ function toast(msg) {
 
 // ================= Settings =================
 const DEFAULTS = {
-  rhythm: 'steady', hz: 10, gStart: 12, gEnd: 6, gMin: 8, drift: false, lock: true, refresh: 'max',
+  rhythm: 'steady', hz: 10, gStart: 12, gEnd: 6, gMin: 8, drift: false, lock: true, refresh: 'max', hzShow: false,
   cj: false, palette: 'sunset', cycle: 3,
   flash: '#ffffff', off: '#000000', bright: 70,
   pattern: 'full', pspeed: 1, split: 'both', splitColor: '#3366ff',
@@ -1167,8 +1169,8 @@ const RESEARCH = [
     why: 'Built for complex scenes, which peaked around 9 minutes in and keep coming with time: 25 minutes of steady 10 Hz in warm amber, which passes through eyelids well, with a longer calming lead-in.',
     cfg: { ...BASE, hz: 10, flash: '#ff991a', bright: 65, mins: 25, breathOn: true, breathRounds: 8, breathSec: 4, breathVol: 40, bgOn: true, bg: 'brown', bgVol: 30 } },
   { name: 'Find your frequency', time: '~17 min',
-    why: 'Each person\'s visions are tied to particular rates. This slowly steps from 12 Hz down to 8 Hz through the exact frame-locked rates. Note in the journal when it got strongest, then use that rate in Steady mode.',
-    cfg: { ...BASE, rhythm: 'glide', gStart: 12, gEnd: 8, gMin: 14, flash: '#ffffff', bright: 65, mins: 15, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40, bgOn: true, bg: 'pink', bgVol: 30 } },
+    why: 'Each person\'s visions are tied to particular rates. This slowly steps from 12 Hz down to 8 Hz through the exact frame-locked rates. The current rate is shown small below center: open your eyes when the visuals peak, note the rate in the journal, then use it in Steady mode.',
+    cfg: { ...BASE, rhythm: 'glide', gStart: 12, gEnd: 8, gMin: 14, hzShow: true, flash: '#ffffff', bright: 65, mins: 15, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40, bgOn: true, bg: 'pink', bgVol: 30 } },
   { name: 'Drum-locked journey', time: '~22 min',
     why: 'Steady drumming helped experienced practitioners turn inward in brain-scan research. Here the drum strikes on every second flash (5 beats a second at 10 Hz), so sound and light share one rhythm.',
     cfg: { ...BASE, hz: 10, flash: '#ff991a', bright: 60, mins: 20, breathOn: true, breathRounds: 6, breathSec: 4, breathVol: 40, bgOn: true, bg: 'brown', bgVol: 20, drumOn: true, drumRate: 5, drumSync: true, drumVol: 55 } },
@@ -1747,6 +1749,8 @@ function createSession(mode, override) {
     const dk = Math.max(cfg.bright / 100, 0.3) * Math.max(light, 0.3);
     return {
       t, hz, on, light,
+      // Rate readout for eyes-open checks. Locked timing shows the exact rate on screen (refresh / frames per cycle).
+      rate: cfg.hzShow && t >= 0 && light > 0 ? { text: hz.toFixed(1) + ' Hz', a: clamp01(light * 2) } : null,
       eye(i) {
         const eOn = cfg.split === 'alt' && i === 1 ? !on : on;
         const eFl = cfg.split === 'colors' && i === 1 ? splitRGB.map(v => v * k) : fl;
@@ -1780,6 +1784,7 @@ uniform vec3 uFlash, uOff; uniform float uOn;
 uniform int uPat; uniform float uT;
 uniform vec3 uDotCol; uniform float uDotR; uniform float uDotA;
 uniform vec3 uSymCol; uniform float uBreath; uniform float uGuide; uniform float uProg; uniform float uSide;
+uniform sampler2D uTxt; uniform float uTxtA;
 const float TAU = 6.2831853;
 void main(){
   vec2 q = (gl_FragCoord.xy - uC) / uPPR;
@@ -1816,6 +1821,14 @@ void main(){
     float halo = exp(-pow(max(a - R, 0.0) * 12.0, 2.0)) * 0.35 * uBreath + exp(-pow(max(ad - rDot, 0.0) * 40.0, 2.0)) * 0.25 * (1.0 - fill);
     col += uSymCol * (ring * 0.9 + core * (0.85 + 0.45 * uBreath) + halo) * uGuide;
   }
+  if (uTxtA > 0.001) {
+    // Rate readout: a small label 0.24 rad below center, 0.24 x 0.06 rad, from a text texture (rgb = color, a = coverage).
+    vec2 tuv = (q - vec2(-0.12, -0.27)) / vec2(0.24, 0.06);
+    if (tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0) {
+      vec4 tx = texture2D(uTxt, vec2(tuv.x, 1.0 - tuv.y));
+      col = mix(col, tx.rgb, tx.a * uTxtA);
+    }
+  }
   gl_FragColor = vec4(col, 1.0);
 }`;
 function makeRenderer(gl) {
@@ -1829,8 +1842,24 @@ function makeRenderer(gl) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
   const loc = n => gl.getUniformLocation(pr, n);
-  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide'].map(n => [n, loc(n)]));
+  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide','uTxt','uTxtA'].map(n => [n, loc(n)]));
   const aP = gl.getAttribLocation(pr, 'p');
+  // Text texture for the rate readout: a dark pill with light text, so it reads on both the flash and the dark phase.
+  let txTex = null, txText = '';
+  const txC = document.createElement('canvas'); txC.width = 512; txC.height = 128;
+  function setText(s) {
+    if (s === txText && txTex) return; txText = s;
+    const c = txC.getContext('2d'); c.clearRect(0, 0, 512, 128);
+    c.fillStyle = 'rgba(0,0,0,0.78)'; c.beginPath(); c.roundRect ? c.roundRect(96, 14, 320, 100, 50) : c.rect(96, 14, 320, 100); c.fill();
+    c.fillStyle = 'rgba(196,192,204,1)'; c.font = '500 64px "IBM Plex Mono", ui-monospace, monospace';
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(s, 256, 66);
+    if (!txTex) txTex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, txTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, txC);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.activeTexture(gl.TEXTURE0);
+  }
   return {
     // Draw one eye (or the whole screen) into the given viewport.
     draw(F, eyeIdx, vp, cx, cy, ppr) {
@@ -1848,6 +1877,11 @@ function makeRenderer(gl) {
       } else gl.uniform1f(U.uDotA, 0);
       if (F.sym) { gl.uniform3fv(U.uSymCol, F.sym.col); gl.uniform1f(U.uBreath, F.sym.b); gl.uniform1f(U.uGuide, F.sym.g); gl.uniform1f(U.uProg, F.sym.prog ?? 1); gl.uniform1f(U.uSide, F.sym.side || 0); }
       else gl.uniform1f(U.uGuide, 0);
+      if (F.rate) {
+        setText(F.rate.text);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, txTex); gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1i(U.uTxt, 1); gl.uniform1f(U.uTxtA, F.rate.a);
+      } else gl.uniform1f(U.uTxtA, 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
   };
