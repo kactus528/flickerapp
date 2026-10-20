@@ -274,7 +274,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
       <label class="toggle"><input type="checkbox" data-key="breathOn"> Begin with a guided breath</label>
       <div class="sub" id="b_breathRows">
         <div class="presets" data-key="breathPattern" role="group" aria-label="Breath pattern">
-          <button class="chip" data-v="444">4-4-4</button>
+          <button class="chip" data-v="444">Box 4-4-4-4</button>
           <button class="chip" data-v="478">4-7-8</button>
           <button class="chip" data-v="res">Resonance</button>
         </div>
@@ -601,7 +601,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <div class="row">
           <span class="lbl">Pattern</span>
           <div class="presets" data-key="breathPattern" role="group" aria-label="Breath pattern">
-          <button class="chip" data-v="444">4-4-4</button>
+          <button class="chip" data-v="444">Box 4-4-4-4</button>
           <button class="chip" data-v="478">4-7-8</button>
           <button class="chip" data-v="res">Resonance</button>
         </div>
@@ -837,7 +837,7 @@ delete state.kind;
 
 // Guided-breath patterns before the flicker, as seconds of [in, hold, out, hold after out].
 const BREATH_PATTERNS = {
-  '444': { name: '4-4-4', phases: c => [c.breathSec, c.breathSec, c.breathSec, 0], note: c => `In ${c.breathSec}, hold ${c.breathSec}, out ${c.breathSec}.` },
+  '444': { name: 'box', phases: c => [c.breathSec, c.breathSec, c.breathSec, c.breathSec], note: c => `Box breathing: in ${c.breathSec}, hold ${c.breathSec}, out ${c.breathSec}, hold empty ${c.breathSec}.` },
   '478': { name: '4-7-8', phases: () => [4, 7, 8, 0], note: () => 'In 4, hold 7, out 8. A slow, settling breath.' },
   'res': { name: 'Resonance', phases: () => [5.5, 0, 5.5, 0], note: () => 'In 5.5 seconds, out 5.5: about 5.5 breaths a minute, the pace studied most for calming the body.' }
 };
