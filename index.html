@@ -2477,11 +2477,13 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   // ---------------- panel (canvas UI) ----------------
   const PW = 2048, PH = 1280, PANEL_W = 1.6, PANEL_H = PANEL_W * PH / PW, PANEL_DIST = 1.75;
   const cvs = document.createElement('canvas'); cvs.width = PW; cvs.height = PH;
-  const cx = cvs.getContext('2d');
+  let cx = cvs.getContext('2d');
   const C = { bg: 'rgba(14,12,22,0.88)', line: 'rgba(255,255,255,0.10)', card: 'rgba(255,255,255,0.07)', cardHi: 'rgba(255,255,255,0.15)',
               fg: '#f1edf7', muted: '#c6c0d3', accent: '#ff5a4e', warn: '#ffc06a' };
   const F = { disp: '"Syne", "Avenir Next", sans-serif', body: '"IBM Plex Sans", system-ui, sans-serif', mono: '"IBM Plex Mono", ui-monospace, monospace' };
   let buttons = [], hovered = new Set(), panelDirty = true;
+  const hoverSince = new Map();   // button id -> time it became highlighted, for scrolling text
+  let marquee = false, frameN = 0, tickCvs = null; // marquee: true while a highlighted card is scrolling its description
   function rr(x, y, w, h, r) { cx.beginPath(); cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r); cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath(); }
   function text(t, x, y, font, color, align = 'left') { cx.font = font; cx.fillStyle = color; cx.textAlign = align; cx.textBaseline = 'alphabetic';
     cx.shadowColor = 'rgba(0,0,0,0.55)'; cx.shadowBlur = 14; cx.fillText(t, x, y); cx.shadowColor = 'transparent'; cx.shadowBlur = 0; }
@@ -2494,6 +2496,29 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     }
     if (line) { text(line, x, y + n * lh, font, color); n++; }
     return n;
+  }
+  // One line of text that fits in maxW. If it is too long it is clipped, and while `scroll` is on it slides
+  // left after a short pause so the whole line can be read, then loops round with a gap.
+  function ticker(t, x, y, maxW, font, color, scroll, since) {
+    cx.font = font; const w = cx.measureText(t).width;
+    if (w <= maxW) { text(t, x, y, font, color); return; }
+    const gap = 120, loop = w + gap, el = Math.max(0, performance.now() - since - 700);
+    const off = scroll ? (el * 0.14) % loop : 0;   // 140 canvas px per second
+    if (scroll) {
+      cx.save(); cx.beginPath(); cx.rect(x - 4, y - 50, maxW + 8, 70); cx.clip();
+      text(t, x - off, y, font, color); text(t, x - off + loop, y, font, color); marquee = true;
+      cx.restore();
+    }
+    else {   // fade the clipped end so it reads as "more": draw on a scratch canvas, fade there, then copy across
+      const s = tickCvs || (tickCvs = document.createElement('canvas')), sw = Math.ceil(maxW + 8), sh = 70;
+      if (s.width !== sw) { s.width = sw; s.height = sh; }
+      const sc = s.getContext('2d'); sc.clearRect(0, 0, sw, sh);
+      const keep = cx; cx = sc; text(t, 4, 50, font, color); cx = keep;
+      const g = sc.createLinearGradient(sw - 90, 0, sw, 0);
+      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
+      sc.globalCompositeOperation = 'destination-out'; sc.fillStyle = g; sc.fillRect(sw - 90, 0, 90, sh); sc.globalCompositeOperation = 'source-over';
+      cx.drawImage(s, x - 4, y - 50);
+    }
   }
   function button(id, x, y, w, h, draw, onClick) { buttons.push({ id, x, y, w, h, onClick }); draw(hovered.has(id)); }
   function pill(id, x, y, w, h, label, { primary = false, selected = false, disabled = false, size = 40 } = {}, onClick) {
@@ -2521,7 +2546,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     return `${c.rhythm === 'glide' ? `${c.gStart}→${c.gEnd}` : c.hz} Hz · ~${Math.round(total / 60)} min`;
   }
   function drawPanel() {
-    buttons = [];
+    buttons = []; marquee = false;
     cx.clearRect(0, 0, PW, PH);
     // Frosted glass: a see-through tint, darker toward the bottom where the buttons sit, with a light top edge.
     rr(4, 4, PW - 8, PH - 8, 56);
@@ -2544,7 +2569,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
           cx.lineWidth = 3; cx.strokeStyle = hi ? C.accent : C.line; cx.stroke();
           text(it.name, x + 34, y + 68, `500 46px ${F.body}`, C.fg);
           text(it.breath ? `breath only · ~${styleMinutes(it.breath)} min` : metaOf(it.cfg), x + 34, y + 116, `400 32px ${F.mono}`, C.muted);
-          wrap(it.short, x + 34, y + 166, cw - 68, 40, `400 33px ${F.body}`, it.caution ? C.warn : C.muted, 1);
+          ticker(it.short, x + 34, y + 166, cw - 68, `400 33px ${F.body}`, it.caution ? C.warn : hi ? C.fg : C.muted, hi, hoverSince.get('j' + i) || 0);
         }, () => { L.sel = it; L.view = 'detail'; panelDirty = true; });
       });
       // room chooser + exit
@@ -3004,7 +3029,10 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
         if (b) hoverNow.add(b.id);
         if (src.targetRayMode === 'tracked-pointer') rays.push({ o, d, hit });
       }
-      if (hoverNow.size !== hovered.size || [...hoverNow].some(h => !hovered.has(h))) { hovered = hoverNow; uploadPanel(); }
+      if (hoverNow.size !== hovered.size || [...hoverNow].some(h => !hovered.has(h))) {
+        for (const id of hoverNow) if (!hovered.has(id)) hoverSince.set(id, performance.now());
+        hovered = hoverNow; uploadPanel();
+      } else if (marquee && ++frameN % 2 === 0) uploadPanel();   // keep the highlighted card's text scrolling (30 fps)
     }
     pose.views.forEach(view => {
       drawRoom(view.projectionMatrix, view.transform.inverse.matrix, layer.getViewport(view), t, fade,
@@ -3013,8 +3041,9 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   }
 
   // Desktop preview, used for testing on a flat screen: renders one still view of a room.
-  function preview(canvas, id, { yaw = 0, pitch = 0, view = 'journeys', panel = true, t = 3, tab = null } = {}) {
+  function preview(canvas, id, { yaw = 0, pitch = 0, view = 'journeys', panel = true, t = 3, tab = null, hover = null, hoverAgo = 0 } = {}) {
     if (tab) L.tab = tab;
+    hovered = new Set(hover ? [hover] : []); if (hover) hoverSince.set(hover, performance.now() - hoverAgo);
     const g = canvas.getContext('webgl2', { antialias: true }) || canvas.getContext('webgl');
     init(g); roomId = id; bake(roomOf(id));
     L.view = view; if (view === 'detail') L.sel = journeys()[1];
