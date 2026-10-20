@@ -1,0 +1,2611 @@
+<meta charset="utf-8">
+<title>Ganzflicker VR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+[hidden] { display: none !important; }
+/* Layout: one narrow control column on a dim room-dark ground, grouped into foldable sections; the flicker itself takes the whole view. */
+:root {
+  --bg: #0b0a0f;
+  --panel: #15131c;
+  --panel2: #1c1925;
+  --line: #2a2634;
+  --fg: #e9e4f2;
+  --muted: #9a93a8;
+  --accent: #ff5a4e;
+  --warn: #ffb347;
+  --good: #7ad7a0;
+  --night: #161c38;
+  --display: "Syne", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+/* App shell: a slim top bar, one screen at a time, and a sticky action bar at the bottom of each screen. */
+.app { max-width: 580px; margin: 0 auto; }
+.screen { display: grid; gap: 20px; padding-block: 24px 0; min-height: calc(100vh - 60px); align-content: start; grid-template-rows: auto; }
+.screen[data-screen="welcome"] { padding-top: max(40px, 8vh); min-height: 100vh; }
+.hero { display: grid; gap: 4px; }
+.screen-head { display: grid; gap: 6px; }
+.screen-head h2 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(1.7rem, 6vw, 2.2rem); line-height: 1.05; letter-spacing: -0.01em; text-wrap: balance; }
+.eyebrow { margin: 0; font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.screen > .controls { padding-top: 0; }
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 580px; margin: 0 auto; padding-block: 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 21; background: var(--bg); }
+.brand { font: inherit; font-family: var(--display); font-weight: 800; font-size: 1.15rem; background: none; border: 0; color: var(--fg); cursor: pointer; padding: 6px 4px; }
+.brand span { color: var(--accent); }
+.iconbtn { font: inherit; font-size: 1.2rem; width: 44px; height: 44px; border-radius: 50%; background: var(--panel); color: var(--fg); border: 1px solid var(--line); cursor: pointer; }
+.iconbtn:focus-visible, .brand:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.topbar .iconbtn[hidden] + .brand { margin-left: 0; }
+.stepper { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stepper button { width: 100%; font: inherit; font-size: 0.78rem; color: var(--muted); background: none; border: 0; border-top: 3px solid var(--line); padding: 8px 0 0; text-align: left; cursor: pointer; }
+.stepper button.done { border-top-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--fg); }
+.stepper button[aria-current="step"] { border-top-color: var(--accent); color: var(--accent); font-weight: 500; }
+.stepper button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.foot { position: sticky; bottom: 0; z-index: 10; display: flex; gap: 10px; padding-block: 14px calc(14px + env(safe-area-inset-bottom, 0px)); margin-top: 8px; background: linear-gradient(to top, var(--bg) 75%, transparent); }
+.foot .go { flex: 1; }
+.modebar { display: grid; gap: 8px; }
+.vrhero { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(160deg, var(--night) 0%, var(--bg) 85%); }
+.vrhero h3 { margin: 0 0 4px; font-family: var(--display); font-weight: 700; font-size: 1.3rem; }
+.vrhero .note { color: var(--fg); opacity: 0.8; }
+.seg { display: inline-grid; grid-template-columns: 1fr 1fr; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px; justify-self: start; }
+.seg button { font: inherit; font-size: 0.95rem; color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 8px 22px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: 500; }
+.seg button:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.linkbtn { font: inherit; font-size: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; letter-spacing: inherit; text-transform: none; }
+.extras { display: grid; gap: 8px; border: 1px solid var(--warn); border-radius: 10px; padding: 12px 14px; }
+.extras .chip { justify-self: start; }
+.screen h1:focus, .screen h2:focus { outline: none; }
+.foot .go.secondary { flex: 0 0 auto; min-width: 96px; }
+.screen[data-screen="welcome"] .foot, .screen[data-screen="journal"] .foot { margin-top: auto; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(2.2rem, 7vw, 3.2rem); line-height: 1; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.lede { color: var(--muted); margin: 8px 0 0; max-width: 60ch; }
+.warning { border: 1px solid var(--warn); border-radius: 10px; padding: 16px; display: grid; gap: 10px; }
+.warning h2 { margin: 0; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--warn); }
+.warning p { margin: 0; font-size: 0.95rem; }
+.consent { display: flex; gap: 10px; align-items: flex-start; font-size: 0.95rem; cursor: pointer; }
+.consent input { width: 22px; height: 22px; margin-top: 1px; accent-color: var(--accent); flex: none; }
+
+details.sec { border-top: 1px solid var(--line); padding-top: 14px; }
+details.sec > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-family: var(--display); font-weight: 700; font-size: 1.35rem; }
+details.sec > summary::-webkit-details-marker { display: none; }
+details.sec > summary::after { content: "+"; font-family: var(--mono); font-weight: 400; color: var(--muted); }
+details.sec[open] > summary::after { content: "−"; }
+details.sec > summary:focus-visible { outline: 2px solid var(--fg); outline-offset: 4px; border-radius: 4px; }
+.sum-note { font-family: var(--body); font-weight: 400; font-size: 0.85rem; color: var(--muted); margin-left: auto; text-align: right; }
+.controls { display: grid; gap: 18px; padding-top: 16px; }
+.sub { display: grid; gap: 18px; padding-left: 30px; }
+.group-label { font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.row { display: grid; gap: 6px; }
+.row label, .row .lbl { display: flex; justify-content: space-between; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.row output { font-family: var(--mono); color: var(--fg); letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
+.presets, .colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; font-size: 0.9rem; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+.chip[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+.chip:disabled { opacity: 0.4; cursor: not-allowed; }
+.chip:focus-visible, .go:focus-visible, .swatch:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.pal { display: inline-block; width: 34px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+.swatch { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.swatch[aria-pressed=true] { border-color: var(--fg); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--fg); }
+.picker { position: relative; overflow: hidden; display: inline-block; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+.picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.picker:focus-within { outline: 2px solid var(--fg); outline-offset: 2px; }
+.toggle { display: flex; gap: 10px; align-items: center; font-size: 0.95rem; }
+.toggle input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+textarea, input[type=text] { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%; box-sizing: border-box; }
+textarea { resize: vertical; line-height: 1.4; }
+textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.recbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.go { font-family: var(--display); font-weight: 700; font-size: 1.15rem; border: 0; border-radius: 10px; padding: 16px; cursor: pointer; background: var(--accent); color: #140808; }
+.go.secondary { background: var(--panel); color: var(--fg); border: 1px solid var(--line); }
+.go.small { font-size: 1rem; padding: 10px 18px; }
+.go.rec.on { background: var(--fg); color: var(--bg); }
+.go:disabled { opacity: 0.35; cursor: not-allowed; }
+.note { font-size: 0.85rem; color: var(--muted); margin: 0; }
+.note code { font-family: var(--mono); color: var(--fg); }
+.actions { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 18px; }
+.plan { font-family: var(--mono); font-size: 0.85rem; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; }
+.saverow { display: flex; gap: 8px; }
+.saverow input { flex: 1; min-width: 0; }
+.mypresets { display: flex; flex-wrap: wrap; gap: 8px; }
+.mine { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.mine .chip { border: 0; border-radius: 0; }
+.mine .del { border-left: 1px solid var(--line); color: var(--muted); padding: 8px 12px; }
+.mine .del.confirm { color: var(--accent); }
+
+.rsets { display: grid; gap: 8px; }
+.rset { display: grid; gap: 2px; text-align: left; font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+.rset:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.rset[aria-pressed=true] { border-color: var(--accent); }
+.rset b { font-weight: 500; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rset b span { font-family: var(--mono); font-weight: 400; font-size: 0.8rem; color: var(--muted); }
+.rset small { color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
+.rset .caution { color: var(--warn); }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.9rem; color: var(--muted); }
+.stats b { color: var(--fg); font-family: var(--mono); font-weight: 400; }
+.best { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; }
+.best p { margin: 0; font-size: 0.9rem; }
+.entries { display: grid; gap: 12px; }
+.entry { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 8px; min-width: 0; }
+.entry-top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.entry-date { font-weight: 500; }
+.entry-meta { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+.entry-sum { font-size: 0.85rem; color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+.entry-note { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rating { color: var(--warn); letter-spacing: 2px; font-size: 0.9rem; }
+.entry-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.entry-actions .chip { font-size: 0.85rem; padding: 6px 12px; }
+.del.confirm { border-color: var(--accent); color: var(--accent); }
+.empty { color: var(--muted); font-size: 0.95rem; margin: 0; }
+
+.modal { position: fixed; inset: 0; z-index: 60; background: rgb(0 0 0 / 0.7); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sheet { background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 20px; width: 100%; max-width: 520px; max-height: 100%; overflow: auto; display: grid; gap: 16px; box-sizing: border-box; }
+.sheet h2 { margin: 0; font-family: var(--display); font-size: 1.5rem; }
+.stars { display: flex; gap: 8px; flex-wrap: wrap; }
+.stars .chip { min-width: 44px; }
+.sheet-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+
+#stage { position: fixed; inset: 0; background: #000; z-index: 50; cursor: none; }
+#stage canvas { width: 100%; height: 100%; display: block; }
+#stage .hint { position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); text-align: center; font-family: var(--mono); font-size: 13px; color: #555; mix-blend-mode: difference; pointer-events: none; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem; z-index: 70; max-width: calc(100% - 32px); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono&display=swap">
+
+<header class="topbar" id="topbar" hidden>
+  <button class="iconbtn" id="navBack" type="button" aria-label="Back">←</button>
+  <button class="brand" data-go="home" type="button">Ganz<span>flicker</span></button>
+  <button class="chip" id="navJournal" data-go="journal" type="button">Journal</button>
+</header>
+
+<main class="app">
+  <section class="screen" data-screen="welcome" aria-labelledby="h-welcome">
+    <div class="hero">
+      <h1 id="h-welcome">Ganz<span>flicker</span></h1>
+      <p class="lede">Put the headset on, close your eyes, and let a full-field flicker shine through your eyelids. At the right rate, most people start seeing colors, geometric patterns, and sometimes whole scenes.</p>
+    </div>
+    <section class="warning" aria-labelledby="warn-h">
+    <h2 id="warn-h">Read this first</h2>
+    <p>Flashing light in the 3–30 Hz range can trigger seizures in people with photosensitive epilepsy, including people who have never had one before. Don't use this if you or close family have epilepsy or seizures, if you've had migraines triggered by light, or if you're tired, drunk, or high.</p>
+    <p>Stop right away if you feel dizzy, nauseous, get a headache, notice muscle twitching, or feel confused. Pressing any controller button or tapping the screen stops the flicker instantly. Have someone nearby the first time.</p>
+    <label class="consent"><input type="checkbox" id="consent"> I've read this and none of it applies to me.</label>
+  </section>
+    <div class="foot">
+      <button class="go" id="agree" type="button" disabled>I agree, continue</button>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="home" hidden aria-labelledby="h-home">
+    <div class="screen-head">
+      <h2 id="h-home">Choose a journey</h2>
+      <p class="note">Pick a setup to go straight to the start screen, or build your own.</p>
+    </div>
+    <div class="vrhero">
+      <div class="vrhero-text">
+        <h3>The VR lobby</h3>
+        <p class="note" id="lobbyNote">Sit under a starlit sky, by a lake at dusk, in deep space or in a quiet void. Choose a journey, start it and rate it, all inside the headset.</p>
+      </div>
+      <button class="go" id="enterLobby" type="button">Enter VR</button>
+    </div>
+    <div class="modebar">
+      <div class="seg" role="group" aria-label="Settings mode">
+        <button type="button" data-mode="basic">Basic</button>
+        <button type="button" data-mode="advanced">Advanced</button>
+      </div>
+      <p class="note" id="modeNote"></p>
+    </div>
+    <section class="controls" aria-labelledby="rs-h" style="padding-top:0">
+    <h2 class="group-label" id="rs-h">Research-based setups</h2>
+    <p class="note">Built from the flicker studies for the strongest visuals: steady, frame-locked flicker around 10 Hz on closed eyes, masking noise, a calm start, and enough time for complex imagery, which tends to arrive after about 9 minutes.</p>
+    <div class="rsets" id="research"></div>
+  </section>
+    <section class="controls" aria-labelledby="qs-h" style="padding-top:0">
+    <h2 class="group-label" id="qs-h">More setups</h2>
+    <div class="presets" id="builtins"></div>
+    <div class="mypresets" id="mine"></div>
+  </section>
+    <div class="foot">
+      <button class="go secondary" data-go="journal" type="button">Journal</button>
+      <button class="go" data-go="settings" type="button">Build your own</button>
+    </div>
+  </section>
+
+
+  <section class="screen" data-screen="basic" hidden aria-labelledby="h-basic">
+    <div class="screen-head">
+      <p class="eyebrow">Basic settings</p>
+      <h2 id="h-basic">Your session</h2>
+      <p class="note">The essentials. Everything else stays at settings the research supports.</p>
+    </div>
+    <div class="extras" id="extras" hidden>
+      <p class="note" id="extrasText"></p>
+      <button class="chip" id="clearExtras" type="button">Turn them off</button>
+    </div>
+    <div class="controls">
+      <div class="row">
+        <label for="b_hz">Flicker rate <output data-for="b_hz"></output></label>
+        <input type="range" id="b_hz" data-key="hz" min="4" max="15" step="0.5">
+        <div class="presets" data-key="hz" role="group" aria-label="Rate presets">
+          <button class="chip" data-v="6">6 Hz · dreamy</button>
+          <button class="chip" data-v="8">8 Hz</button>
+          <button class="chip" data-v="10">10 Hz · strongest</button>
+          <button class="chip" data-v="12">12 Hz</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="lbl">Color</span>
+        <div class="colors" data-key="flash" role="group" aria-label="Flash color">
+          <button class="swatch" data-v="#ffffff" style="background:#fff" aria-label="White"></button>
+          <button class="swatch" data-v="#ff991a" style="background:#ff991a" aria-label="Amber"></button>
+          <button class="swatch" data-v="#3366ff" style="background:#3366ff" aria-label="Blue"></button>
+          <button class="swatch" data-v="#ff1408" style="background:#ff1408" aria-label="Red"></button>
+          <label class="swatch picker" title="Pick any color"><input type="color" data-key="flash" aria-label="Custom flash color"></label>
+        </div>
+      </div>
+      <div class="row">
+        <label for="b_bright">Brightness <output data-for="b_bright"></output></label>
+        <input type="range" id="b_bright" data-key="bright" min="10" max="100" step="5">
+      </div>
+      <div class="row">
+        <label for="b_mins">Session length <output data-for="b_mins"></output></label>
+        <input type="range" id="b_mins" data-key="mins" min="1" max="60" step="1">
+      </div>
+      <label class="toggle"><input type="checkbox" data-key="breathOn"> Begin with a guided breath (about 1½ minutes)</label>
+      <label class="toggle"><input type="checkbox" data-key="bgOn"> Background sound</label>
+      <div class="sub" id="b_bgRows">
+        <div class="presets" data-key="bg" role="group" aria-label="Background sound">
+          <button class="chip" data-v="rain">Rain</button>
+          <button class="chip" data-v="ocean">Ocean</button>
+          <button class="chip" data-v="drone">Drone</button>
+          <button class="chip" data-v="pink">Soft noise</button>
+          <button class="chip" data-v="brown">Deep noise</button>
+        </div>
+        <div class="row">
+          <label for="b_bgVol">Volume <output data-for="b_bgVol"></output></label>
+          <input type="range" id="b_bgVol" data-key="bgVol" min="0" max="100" step="5">
+        </div>
+      </div>
+      <div class="row">
+        <span class="lbl">Ending</span>
+        <div class="presets" data-key="ending" role="group" aria-label="How the session ends">
+          <button class="chip" data-v="wake">Gentle wake-up</button>
+          <button class="chip" data-v="sleep">Drift off to sleep</button>
+          <button class="chip" data-v="stop">Just stop</button>
+        </div>
+      </div>
+      <button class="linkbtn" data-setmode="advanced" type="button" style="justify-self:start">Show all settings (Advanced)</button>
+    </div>
+    <div class="foot">
+      <button class="go secondary" data-go="home" type="button">Back</button>
+      <button class="go" data-go="ready" type="button">Review and start</button>
+    </div>
+  </section>
+  <section class="screen" data-screen="light" hidden aria-labelledby="h-light">
+    <ol class="stepper" aria-label="Customize steps"></ol>
+    <div class="screen-head">
+      <p class="eyebrow">Step 1 of 4 · <button class="linkbtn" data-setmode="basic" type="button">Switch to Basic</button></p>
+      <h2 id="h-light">Light</h2>
+      <p class="note" id="sumLight"></p>
+    </div>
+    <div class="controls">
+      <div class="row">
+        <span class="lbl">Rhythm</span>
+        <div class="presets" data-key="rhythm" role="group" aria-label="Rhythm">
+          <button class="chip" data-v="steady">Steady</button>
+          <button class="chip" data-v="glide">Journey (glides between rates)</button>
+        </div>
+      </div>
+
+      <div class="sub" id="steadyRows">
+        <div class="row">
+          <label for="hz">Frequency <output data-for="hz"></output></label>
+          <input type="range" id="hz" data-key="hz" min="4" max="15" step="0.5">
+          <div class="presets" data-key="hz" role="group" aria-label="Frequency presets">
+            <button class="chip" data-v="6">Theta · 6 Hz</button>
+            <button class="chip" data-v="10">Alpha · 10 Hz</button>
+            <button class="chip" data-v="12">High alpha · 12 Hz</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub" id="glideRows">
+        <div class="presets" role="group" aria-label="Journey presets">
+          <button class="chip" data-glide="12,8,5">Settle · 12→8</button>
+          <button class="chip" data-glide="12,6,8">Descend · 12→6</button>
+          <button class="chip" data-glide="10,4.5,12">Deep dive · 10→4.5</button>
+        </div>
+        <div class="row">
+          <label for="gStart">Start at <output data-for="gStart"></output></label>
+          <input type="range" id="gStart" data-key="gStart" min="4" max="15" step="0.5">
+        </div>
+        <div class="row">
+          <label for="gEnd">End at <output data-for="gEnd"></output></label>
+          <input type="range" id="gEnd" data-key="gEnd" min="4" max="15" step="0.5">
+        </div>
+        <div class="row">
+          <label for="gMin">Glide over <output data-for="gMin"></output></label>
+          <input type="range" id="gMin" data-key="gMin" min="1" max="30" step="1">
+        </div>
+        <p class="note">The rate eases from start to end over this time, then holds there for the rest of the session.</p>
+      </div>
+
+      <label class="toggle"><input type="checkbox" data-key="drift"> Slow drift (wanders ±1 Hz around the rate)</label>
+
+      <label class="toggle"><input type="checkbox" data-key="lock"> Lock to the screen's refresh rate (every flash exactly the same length)</label>
+      <div class="sub" id="lockRows">
+        <div class="row">
+          <span class="lbl">Headset refresh rate (VR)</span>
+          <div class="presets" data-key="refresh" role="group" aria-label="Headset refresh rate">
+            <button class="chip" data-v="max">Highest available</button>
+            <button class="chip" data-v="72">72 Hz</button>
+            <button class="chip" data-v="90">90 Hz</button>
+            <button class="chip" data-v="120">120 Hz</button>
+          </div>
+        </div>
+        <p class="note" id="lockHint"></p>
+      </div>
+
+      <label class="toggle"><input type="checkbox" data-key="cj"> Color journey (flash color slowly drifts through a palette)</label>
+      <div class="sub" id="cjRows">
+        <div class="presets" data-key="palette" role="group" aria-label="Palette" id="palettes"></div>
+        <div class="row">
+          <label for="cycle">One trip through the palette <output data-for="cycle"></output></label>
+          <input type="range" id="cycle" data-key="cycle" min="0.5" max="10" step="0.5">
+        </div>
+      </div>
+
+      <div class="row" id="flashRow">
+        <span class="lbl">Flash color</span>
+        <div class="colors" data-key="flash" role="group" aria-label="Flash color">
+          <button class="swatch" data-v="#ffffff" style="background:#fff" aria-label="White"></button>
+          <button class="swatch" data-v="#ff1408" style="background:#ff1408" aria-label="Red"></button>
+          <button class="swatch" data-v="#3366ff" style="background:#3366ff" aria-label="Blue"></button>
+          <button class="swatch" data-v="#ff991a" style="background:#ff991a" aria-label="Amber"></button>
+          <label class="swatch picker" title="Pick any color"><input type="color" data-key="flash" aria-label="Custom flash color"></label>
+        </div>
+      </div>
+
+      <div class="row">
+        <span class="lbl">Between-flash color</span>
+        <div class="colors" data-key="off" role="group" aria-label="Between-flash color">
+          <button class="swatch" data-v="#000000" style="background:#000" aria-label="Black"></button>
+          <label class="swatch picker" title="Pick any color"><input type="color" data-key="off" aria-label="Custom between-flash color"></label>
+        </div>
+        <p class="note">Black gives the classic on/off flash. Pick a color to alternate between two colors instead.</p>
+      </div>
+
+      <div class="row">
+        <label for="bright">Brightness <output data-for="bright"></output></label>
+        <input type="range" id="bright" data-key="bright" min="10" max="100" step="5">
+      </div>
+
+      <div class="row">
+        <span class="lbl">Pattern</span>
+        <div class="presets" data-key="pattern" role="group" aria-label="Pattern">
+          <button class="chip" data-v="full">Full field</button>
+          <button class="chip" data-v="spiral">Spiral</button>
+          <button class="chip" data-v="rings">Radial pulse</button>
+          <button class="chip" data-v="tunnel">Tunnel</button>
+        </div>
+        <p class="note">Patterns are for eyes-open sessions. With eyes closed, your eyelids blur them back into full field.</p>
+      </div>
+      <div class="sub" id="pspeedRow">
+        <div class="row">
+          <label for="pspeed">Pattern motion <output data-for="pspeed"></output></label>
+          <input type="range" id="pspeed" data-key="pspeed" min="0" max="3" step="0.25">
+        </div>
+      </div>
+
+      <div class="row">
+        <span class="lbl">Eyes (VR only)</span>
+        <div class="presets" data-key="split" role="group" aria-label="Split-eye mode">
+          <button class="chip" data-v="both">Both together</button>
+          <button class="chip" data-v="alt">Alternate eyes</button>
+          <button class="chip" data-v="colors">Different color per eye</button>
+        </div>
+      </div>
+      <div class="sub" id="splitColorRow">
+        <div class="row">
+          <span class="lbl">Right-eye color</span>
+          <div class="colors" data-key="splitColor" role="group" aria-label="Right eye color">
+            <button class="swatch" data-v="#3366ff" style="background:#3366ff" aria-label="Blue"></button>
+            <button class="swatch" data-v="#ff1408" style="background:#ff1408" aria-label="Red"></button>
+            <button class="swatch" data-v="#18e070" style="background:#18e070" aria-label="Green"></button>
+            <label class="swatch picker" title="Pick any color"><input type="color" data-key="splitColor" aria-label="Custom right eye color"></label>
+          </div>
+        </div>
+      </div>
+
+      <label class="toggle"><input type="checkbox" data-key="dot"> Focus dot in the center (for eyes-open use)</label>
+      <div class="sub" id="dotRows">
+        <div class="row">
+          <label for="dotSize">Dot size <output data-for="dotSize"></output></label>
+          <input type="range" id="dotSize" data-key="dotSize" min="0.1" max="1.5" step="0.05">
+        </div>
+        <div class="row">
+          <span class="lbl">Dot color</span>
+          <div class="colors" data-key="dotColor" role="group" aria-label="Dot color">
+            <button class="swatch" data-v="#000000" style="background:#000" aria-label="Black"></button>
+            <button class="swatch" data-v="#ffffff" style="background:#fff" aria-label="White"></button>
+            <button class="swatch" data-v="#ff1408" style="background:#ff1408" aria-label="Red"></button>
+            <button class="swatch" data-v="#3366ff" style="background:#3366ff" aria-label="Blue"></button>
+            <button class="swatch" data-v="#1ae64d" style="background:#1ae64d" aria-label="Green"></button>
+          </div>
+        </div>
+        <div class="row">
+          <span class="lbl">Dot behavior</span>
+          <div class="presets" data-key="dotMode" role="group" aria-label="Dot behavior">
+            <button class="chip" data-v="steady">Steady</button>
+            <button class="chip" data-v="with">Flicker with light</button>
+            <button class="chip" data-v="against">Flicker opposite</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="go secondary" data-go="home" type="button">Back</button>
+      <button class="go" data-go="sound" type="button">Next: Sound</button>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="sound" hidden aria-labelledby="h-sound">
+    <ol class="stepper" aria-label="Customize steps"></ol>
+    <div class="screen-head">
+      <p class="eyebrow">Step 2 of 4</p>
+      <h2 id="h-sound">Sound</h2>
+      <p class="note" id="sumSound"></p>
+    </div>
+    <div class="controls">
+      <label class="toggle"><input type="checkbox" data-key="iso"> Isochronic tones (a tone that pulses in sync with the light)</label>
+      <label class="toggle"><input type="checkbox" data-key="bin"> Binaural beats (best with earbuds)</label>
+      <div class="sub" id="toneRows">
+        <div class="row">
+          <label for="pitch">Tone pitch <output data-for="pitch"></output></label>
+          <input type="range" id="pitch" data-key="pitch" min="80" max="500" step="10">
+        </div>
+        <div class="row">
+          <label for="toneVol">Tone volume <output data-for="toneVol"></output></label>
+          <input type="range" id="toneVol" data-key="toneVol" min="0" max="100" step="5">
+        </div>
+      </div>
+
+      <label class="toggle"><input type="checkbox" data-key="bgOn"> Background sound</label>
+      <div class="sub" id="bgRows">
+        <div class="presets" data-key="bg" role="group" aria-label="Background sound">
+          <button class="chip" data-v="rain">Rain</button>
+          <button class="chip" data-v="ocean">Ocean waves</button>
+          <button class="chip" data-v="drone">Low drone</button>
+          <button class="chip" data-v="white">White noise</button>
+          <button class="chip" data-v="pink">Pink noise</button>
+          <button class="chip" data-v="brown">Brown noise</button>
+        </div>
+        <div class="row">
+          <label for="bgVol">Background volume <output data-for="bgVol"></output></label>
+          <input type="range" id="bgVol" data-key="bgVol" min="0" max="100" step="5">
+        </div>
+        <label class="toggle"><input type="checkbox" data-key="bgSwell"> Slowly swell up and down, like waves</label>
+        <div class="row" id="swellRow">
+          <label for="bgSwellSec">One swell every <output data-for="bgSwellSec"></output></label>
+          <input type="range" id="bgSwellSec" data-key="bgSwellSec" min="4" max="30" step="1">
+        </div>
+        <button class="chip" id="bgPreview" type="button" style="justify-self:start">▶ Preview 5 seconds</button>
+      </div>
+      <label class="toggle"><input type="checkbox" data-key="drumOn"> Shamanic drumming</label>
+      <div class="sub" id="drumRows">
+        <div class="row">
+          <label for="drumRate">Tempo <output data-for="drumRate"></output></label>
+          <input type="range" id="drumRate" data-key="drumRate" min="2" max="7" step="0.25">
+          <div class="presets" data-key="drumRate" role="group" aria-label="Tempo presets">
+            <button class="chip" data-v="4.5">Classic journey · 4.5</button>
+            <button class="chip" data-v="3">Slow · 3</button>
+            <button class="chip" data-v="6">Fast · 6</button>
+          </div>
+        </div>
+        <label class="toggle"><input type="checkbox" data-key="drumSync"> Lock the beat to the flashes</label>
+        <div class="row">
+          <label for="drumVol">Drum volume <output data-for="drumVol"></output></label>
+          <input type="range" id="drumVol" data-key="drumVol" min="0" max="100" step="5">
+        </div>
+        <button class="chip" id="drumPreview" type="button" style="justify-self:start">▶ Preview 5 seconds</button>
+        <p class="note">Steady drumming around 4–5 beats per second is the traditional rhythm for journeying. Locked to the flashes, the drum strikes on every flash or every second or third one, whichever lands closest to your tempo. With a gentle wake-up ending, the drum plays the traditional callback: slow beats, then a fast roll to bring you back.</p>
+      </div>
+
+      <p class="note">Tones follow the flicker rate, including journeys and drift. Binaural beats play a slightly different pitch in each ear; the difference equals the flicker rate.</p>
+    </div>
+    <div class="foot">
+      <button class="go secondary" data-go="light" type="button">Back</button>
+      <button class="go" data-go="aff" type="button">Next: Affirmation</button>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="aff" hidden aria-labelledby="h-aff">
+    <ol class="stepper" aria-label="Customize steps"></ol>
+    <div class="screen-head">
+      <p class="eyebrow">Step 3 of 4</p>
+      <h2 id="h-aff">Affirmation</h2>
+      <p class="note" id="sumAff"></p>
+    </div>
+    <div class="controls">
+      <label class="toggle"><input type="checkbox" data-key="affOn"> Play a recorded affirmation on repeat</label>
+      <div class="sub" id="affRows">
+        <div class="recbar">
+          <button class="go small rec" id="recBtn" type="button">● Record</button>
+          <button class="chip" id="playBtn" type="button" disabled>▶ Play back</button>
+          <label class="chip" for="affFile">Use an audio file</label>
+          <input type="file" id="affFile" accept="audio/*" hidden>
+        </div>
+        <p class="note" id="recStatus">No affirmation recorded yet. Tap Record, speak, then tap Stop.</p>
+        <div class="row">
+          <span class="lbl">When it plays</span>
+          <div class="presets" data-key="affWhen" role="group" aria-label="When the affirmation plays">
+            <button class="chip" data-v="whole">Whole session</button>
+            <button class="chip" data-v="second">Second half only</button>
+          </div>
+        </div>
+        <label class="toggle"><input type="checkbox" data-key="affFade"> Get quieter as the session goes on</label>
+        <div class="row">
+          <label for="affGap">Pause between repeats <output data-for="affGap"></output></label>
+          <input type="range" id="affGap" data-key="affGap" min="1" max="60" step="1">
+        </div>
+        <div class="row">
+          <label for="affVol">Affirmation volume <output data-for="affVol"></output></label>
+          <input type="range" id="affVol" data-key="affVol" min="10" max="100" step="5">
+        </div>
+        <p class="note">Your recording is saved on this device for next time.</p>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="go secondary" data-go="sound" type="button">Back</button>
+      <button class="go" data-go="session" type="button">Next: Session</button>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="session" hidden aria-labelledby="h-session">
+    <ol class="stepper" aria-label="Customize steps"></ol>
+    <div class="screen-head">
+      <p class="eyebrow">Step 4 of 4</p>
+      <h2 id="h-session">Session</h2>
+      <p class="note" id="sumSession"></p>
+    </div>
+    <div class="controls">
+      <label class="toggle"><input type="checkbox" data-key="breathOn"> Begin with the fourfold breath</label>
+      <div class="sub" id="breathRows">
+        <p class="note">Before the flicker, a soft glow and tone guide your breathing: the light brightens and the tone rises as you breathe in, both hold, they fade as you breathe out, then hold in the dark. A small chime marks each new breath. Then the flicker fades in while the guide fades away over two more breaths.</p>
+        <div class="row">
+          <label for="breathRounds">Guided breaths <output data-for="breathRounds"></output></label>
+          <input type="range" id="breathRounds" data-key="breathRounds" min="2" max="15" step="1">
+        </div>
+        <div class="row">
+          <label for="breathSec">Count for each step <output data-for="breathSec"></output></label>
+          <input type="range" id="breathSec" data-key="breathSec" min="3" max="7" step="1">
+        </div>
+        <div class="row">
+          <label for="breathVol">Guide tone volume <output data-for="breathVol"></output></label>
+          <input type="range" id="breathVol" data-key="breathVol" min="0" max="100" step="5">
+        </div>
+      </div>
+      <div class="row">
+        <label for="mins">Session length <output data-for="mins"></output></label>
+        <input type="range" id="mins" data-key="mins" min="1" max="60" step="1">
+      </div>
+      <div class="row">
+        <span class="lbl">Ending</span>
+        <div class="presets" data-key="ending" role="group" aria-label="How the session ends">
+          <button class="chip" data-v="wake">Gentle wake-up</button>
+          <button class="chip" data-v="sleep">Drift off to sleep</button>
+          <button class="chip" data-v="stop">Just stop</button>
+        </div>
+        <p class="note" id="endingNote"></p>
+      </div>
+      <div class="sub" id="sleepRow">
+        <div class="row">
+          <label for="sleepMin">Sound fades out over <output data-for="sleepMin"></output></label>
+          <input type="range" id="sleepMin" data-key="sleepMin" min="5" max="30" step="5">
+        </div>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="go secondary" data-go="aff" type="button">Back</button>
+      <button class="go" data-go="ready" type="button">Review and start</button>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="ready" hidden aria-labelledby="h-ready">
+    <div class="screen-head">
+      <p class="eyebrow" id="readyFrom">Your session</p>
+      <h2 id="h-ready">Ready when you are</h2>
+    </div>
+    <div class="actions">
+    <p class="plan" id="plan"></p>
+    <button class="go" id="startVR" disabled>Start in VR</button>
+    <button class="go secondary" id="startFS" disabled>Start fullscreen</button>
+    <p class="note" id="xrNote">Checking for VR support…</p>
+    <p class="note">The flicker starts dim and reaches full brightness after 4 seconds. Eyes-open sessions hit harder than closed-eye ones, so start around 30% brightness. The headset's refresh rate limits how exactly a rate can be hit.</p>
+    <div class="row" style="margin-top:8px">
+      <label for="presetName">Save this setup</label>
+      <div class="saverow">
+        <input type="text" id="presetName" maxlength="40" placeholder="Name, e.g. Deep red theta">
+        <button class="chip" id="savePreset" type="button">Save</button>
+      </div>
+    </div>
+  
+      <button class="chip" data-go="settings" type="button" style="justify-self:start">Adjust settings</button>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="journal" hidden aria-labelledby="h-journal">
+    <div class="screen-head">
+      <h2 id="h-journal">Session journal</h2>
+    </div>
+    <div class="controls">
+      <div class="stats" id="stats"></div>
+      <div id="bestBox"></div>
+      <div class="entries" id="entries"></div>
+      <button class="chip" id="showAll" type="button" hidden style="justify-self:start">Show all sessions</button>
+      <p class="note">Every session is logged here automatically. Your notes and voice memos stay on this device.</p>
+    </div>
+    <div class="foot">
+      <button class="go" data-go="home" type="button">Choose a journey</button>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="journal" hidden role="dialog" aria-modal="true" aria-labelledby="jh">
+  <div class="sheet">
+    <h2 id="jh">What did you see?</h2>
+    <p class="note" id="jSum"></p>
+    <div class="row">
+      <span class="lbl">How strong were the visuals?</span>
+      <div class="stars" id="jStars" role="group" aria-label="Rating">
+        <button class="chip" data-r="1">1</button><button class="chip" data-r="2">2</button><button class="chip" data-r="3">3</button><button class="chip" data-r="4">4</button><button class="chip" data-r="5">5</button>
+      </div>
+      <p class="note">1 = barely anything · 5 = vivid scenes</p>
+    </div>
+    <div class="row">
+      <label for="jText">Notes</label>
+      <textarea id="jText" rows="5" placeholder="Colors, shapes, scenes, feelings…"></textarea>
+    </div>
+    <div class="recbar">
+      <button class="go small rec" id="jRec" type="button">● Voice note</button>
+      <button class="chip" id="jPlay" type="button" disabled>▶ Play</button>
+    </div>
+    <p class="note" id="jRecStatus">Speak instead of typing, if you prefer.</p>
+    <div class="sheet-actions">
+      <button class="chip" id="jSkip" type="button">Skip</button>
+      <button class="go small" id="jSave" type="button">Save to journal</button>
+    </div>
+  </div>
+</div>
+
+<div id="stage" hidden><canvas id="fsCanvas"></canvas><div class="hint">Tap or press any key to stop</div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const hexRGB = h => [1,3,5].map(i => parseInt(h.slice(i, i+2), 16) / 255);
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600);
+}
+
+// ================= Settings =================
+const DEFAULTS = {
+  rhythm: 'steady', hz: 10, gStart: 12, gEnd: 6, gMin: 8, drift: false, lock: true, refresh: 'max',
+  cj: false, palette: 'sunset', cycle: 3,
+  flash: '#ffffff', off: '#000000', bright: 70,
+  pattern: 'full', pspeed: 1, split: 'both', splitColor: '#3366ff',
+  dot: false, dotSize: 0.3, dotColor: '#000000', dotMode: 'steady',
+  iso: false, bin: false, pitch: 200, toneVol: 40,
+  bgOn: false, bg: 'rain', bgVol: 30, bgSwell: true, bgSwellSec: 10,
+  drumOn: false, drumRate: 4.5, drumSync: false, drumVol: 60,
+  affOn: false, affWhen: 'whole', affFade: false, affGap: 6, affVol: 80,
+  mins: 10, ending: 'wake', sleepMin: 10,
+  breathOn: false, breathRounds: 6, breathSec: 4, breathVol: 50
+};
+const state = Object.assign({}, DEFAULTS, store.get('gf-last') || {});
+
+const PALETTES = {
+  sunset: { name: 'Sunset', colors: ['#ff2a1a', '#ff9a1a', '#ff2a8a'] },
+  ocean: { name: 'Ocean', colors: ['#1a4dff', '#00c8e0', '#7a3dff'] },
+  aurora: { name: 'Aurora', colors: ['#18e070', '#00c8e0', '#9a3dff'] },
+  ember: { name: 'Ember', colors: ['#ff3010', '#ff7a00', '#c00030'] },
+  rainbow: { name: 'Rainbow', colors: ['#ff2020', '#ffb000', '#30e040', '#2060ff', '#a030ff'] }
+};
+$('#palettes').innerHTML = Object.entries(PALETTES).map(([k, p]) =>
+  `<button class="chip" data-v="${k}"><span class="pal" style="background:linear-gradient(90deg,${p.colors.join(',')})"></span>${p.name}</button>`).join('');
+
+const BUILTINS = [
+  { name: 'First timer', cfg: { rhythm: 'steady', hz: 10, flash: '#ffffff', bright: 50, mins: 5, ending: 'wake' } },
+  { name: 'Deep theta, red, with rain', cfg: { breathOn: true, breathRounds: 6, rhythm: 'glide', gStart: 10, gEnd: 6, gMin: 8, flash: '#ff1408', bright: 70, bin: true, bgOn: true, bg: 'rain', bgVol: 30, mins: 15, ending: 'wake' } },
+  { name: 'Alpha float, ocean', cfg: { rhythm: 'steady', hz: 10, drift: true, cj: true, palette: 'ocean', cycle: 3, bright: 60, bgOn: true, bg: 'ocean', bgVol: 35, mins: 12, ending: 'wake' } },
+  { name: 'Eyes-open spiral', cfg: { rhythm: 'steady', hz: 8, pattern: 'spiral', pspeed: 1, bright: 30, dot: true, dotColor: '#000000', bgOn: true, bg: 'drone', bgVol: 30, mins: 8, ending: 'wake' } },
+  { name: 'Shamanic journey', cfg: { breathOn: true, breathRounds: 6, rhythm: 'glide', gStart: 10, gEnd: 4.5, gMin: 6, flash: '#ff991a', bright: 60, drumOn: true, drumRate: 4.5, drumVol: 60, bgOn: true, bg: 'drone', bgVol: 20, mins: 20, ending: 'wake' } },
+  { name: 'Drift off to sleep', cfg: { rhythm: 'glide', gStart: 10, gEnd: 4.5, gMin: 15, flash: '#3366ff', bright: 40, bgOn: true, bg: 'brown', bgVol: 30, mins: 20, ending: 'sleep', sleepMin: 15 } }
+];
+
+const FMT = {
+  hz: v => (+v).toFixed(1) + ' Hz', gStart: v => (+v).toFixed(1) + ' Hz', gEnd: v => (+v).toFixed(1) + ' Hz',
+  gMin: v => v + ' min', cycle: v => v + ' min', mins: v => v + ' min', sleepMin: v => v + ' min',
+  bright: v => v + '%', toneVol: v => v + '%', bgVol: v => v + '%', affVol: v => v + '%',
+  bgSwellSec: v => v + ' s',
+  drumRate: v => v + ' beats/s', drumVol: v => v + '%',
+  breathRounds: v => v + ` (about ${fmtMinSec(v * 4 * state.breathSec)})`, breathSec: v => v + ' s', breathVol: v => v + '%',
+  pitch: v => v + ' Hz', pspeed: v => v + '×', dotSize: v => v + '°', affGap: v => v + ' s'
+};
+function fmtMinSec(s) { const m = Math.floor(s / 60), r = Math.round(s % 60); return m ? (r ? `${m} min ${r} s` : `${m} min`) : `${r} s`; }
+const parseV = v => (v !== '' && !isNaN(v)) ? Number(v) : v;
+
+function describe(c, withBreath = true) {
+  const parts = [];
+  if (withBreath && c.breathOn) parts.push('breath intro');
+  parts.push(c.rhythm === 'glide' ? `${c.gStart}→${c.gEnd} Hz over ${c.gMin} min` : `${c.hz} Hz`);
+  if (c.drift) parts.push('drift');
+  if (c.lock) parts.push('frame-locked');
+  parts.push(c.cj ? (PALETTES[c.palette]?.name || 'Color') + ' journey' : colorName(c.flash));
+  if (c.pattern !== 'full') parts.push({ spiral: 'spiral', rings: 'radial pulse', tunnel: 'tunnel' }[c.pattern]);
+  if (c.split === 'alt') parts.push('alternate eyes'); else if (c.split === 'colors') parts.push('two-color eyes');
+  if (c.iso) parts.push('isochronic');
+  if (c.bin) parts.push('binaural');
+  if (c.bgOn) parts.push({ rain: 'rain', ocean: 'ocean', drone: 'drone', white: 'white noise', pink: 'pink noise', brown: 'brown noise' }[c.bg]);
+  if (c.drumOn) parts.push('drum ' + (c.drumSync ? 'on flashes' : c.drumRate + '/s'));
+  if (c.affOn) parts.push('affirmation');
+  return parts.join(' · ');
+}
+function colorName(h) {
+  return { '#ffffff': 'white', '#ff1408': 'red', '#3366ff': 'blue', '#ff991a': 'amber' }[h] || 'custom color';
+}
+function endingText(c) {
+  return { wake: 'ends with a gentle wake-up', sleep: `then sound fades over ${c.sleepMin} min`, stop: 'stops at the end' }[c.ending];
+}
+
+// Two-way binding: every control carries data-key; syncUI paints the page from state.
+function show(id, on) { const el = $(id); if (el) el.hidden = !on; }
+function syncUI() {
+  $$('input[type=range][data-key]').forEach(el => {
+    el.value = state[el.dataset.key];
+    const out = $(`output[data-for="${el.id}"]`); if (out) out.textContent = FMT[el.dataset.key](state[el.dataset.key]);
+  });
+  $$('input[type=checkbox][data-key]').forEach(el => el.checked = !!state[el.dataset.key]);
+  $$('div[data-key]').forEach(g => {
+    const k = g.dataset.key; let hit = false;
+    g.querySelectorAll('button[data-v]').forEach(b => {
+      const on = String(parseV(b.dataset.v)) === String(state[k]); b.setAttribute('aria-pressed', on); hit ||= on;
+    });
+    const pick = g.querySelector('.picker');
+    if (pick) {
+      pick.setAttribute('aria-pressed', !hit);
+      const inp = pick.querySelector('input'); inp.value = state[k];
+      pick.style.background = hit ? '' : state[k];
+    }
+  });
+  $$('[data-glide]').forEach(b => {
+    const [s, e, m] = b.dataset.glide.split(',').map(Number);
+    b.setAttribute('aria-pressed', state.gStart === s && state.gEnd === e && state.gMin === m);
+  });
+  show('#steadyRows', state.rhythm === 'steady');
+  show('#glideRows', state.rhythm === 'glide');
+  show('#cjRows', state.cj);
+  show('#flashRow', !state.cj);
+  show('#pspeedRow', state.pattern !== 'full');
+  show('#splitColorRow', state.split === 'colors');
+  show('#dotRows', state.dot);
+  show('#toneRows', state.iso || state.bin);
+  show('#lockRows', state.lock);
+  show('#breathRows', state.breathOn);
+  $('#lockHint').textContent = lockHint();
+  show('#bgRows', state.bgOn);
+  show('#b_bgRows', state.bgOn);
+  if (typeof updateExtras === 'function' && $('#extras')) updateExtras();
+  show('#swellRow', state.bgSwell);
+  show('#drumRows', state.drumOn);
+  show('#affRows', state.affOn);
+  show('#sleepRow', state.ending === 'sleep');
+  $('#endingNote').textContent = {
+    wake: 'Over the last 90 seconds the flicker eases toward a lighter rhythm and fades out, then a soft chime brings you back.',
+    sleep: 'The flicker fades at the end, but the sounds keep going and slowly fade out, so you can fall asleep. The journal waits for you afterwards.',
+    stop: 'The flicker and sound fade out over the last few seconds.'
+  }[state.ending];
+  $('#sumLight').textContent = (state.rhythm === 'glide' ? `${state.gStart}→${state.gEnd} Hz` : `${state.hz} Hz`) + ' · ' + (state.cj ? PALETTES[state.palette].name : colorName(state.flash));
+  const snd = [state.iso && 'isochronic', state.bin && 'binaural', state.bgOn && state.bg, state.drumOn && 'drum'].filter(Boolean);
+  $('#sumSound').textContent = snd.length ? snd.join(' · ') : 'off';
+  $('#sumAff').textContent = state.affOn ? (affBlob ? 'on' : 'on · not recorded') : 'off';
+  const breathS = state.breathOn ? state.breathRounds * 4 * state.breathSec : 0;
+  $('#sumSession').textContent = (state.breathOn ? 'breath + ' : '') + state.mins + ' min';
+  $('#plan').textContent = (state.breathOn ? `${fmtMinSec(breathS)} fourfold breath, then ` : '') + `${state.mins} min · ${describe(state, false)} · ${endingText(state)}`;
+}
+// What the frame-locked rate becomes for a requested rate on a given refresh rate.
+const exact = (hz, refresh) => { const n = Math.max(2, Math.round(refresh / hz)); return { n, hz: refresh / n }; };
+const fmtHz = v => (Math.abs(v - Math.round(v)) < 0.005 ? Math.round(v) : v.toFixed(2)) + ' Hz';
+function lockHint() {
+  if (state.drift) return 'With drift on, the rate steps between nearby exact rates instead of sliding smoothly.';
+  const rates = state.refresh === 'max' ? [72, 90, 120] : [+state.refresh];
+  if (state.rhythm === 'glide') {
+    const r = rates[rates.length - 1];
+    const steps = []; let last = 0;
+    for (let n = Math.round(r / Math.max(state.gStart, state.gEnd)); n <= Math.round(r / Math.min(state.gStart, state.gEnd)); n++) { const v = r / n; if (Math.abs(v - last) > 0.01) steps.push(fmtHz(v)); last = v; }
+    return `The journey steps through the exact rates on the way. At ${r} Hz those are ${steps.join(', ')}.`;
+  }
+  const parts = rates.map(r => { const e = exact(state.hz, r); return `${r} Hz screen → ${fmtHz(e.hz)} (${e.n} frames per flash)`; });
+  return `${fmtHz(state.hz)} becomes: ${parts.join(' · ')}. In VR the page uses ${state.refresh === 'max' ? 'the highest rate the headset offers' : 'the rate you picked'}; fullscreen uses whatever the screen runs at.`;
+}
+function changed() {
+  syncUI(); store.set('gf-last', state);
+  $$('.rset').forEach(x => x.setAttribute('aria-pressed', 'false'));
+  const rf = $('#readyFrom'); if (rf) rf.textContent = 'Your custom setup';
+}
+
+document.addEventListener('input', e => {
+  const el = e.target, k = el.dataset?.key;
+  if (!k || !(k in state)) return;
+  if (el.type === 'range') state[k] = +el.value;
+  else if (el.type === 'color') state[k] = el.value;
+  else if (el.type === 'checkbox') state[k] = el.checked;
+  changed();
+});
+document.addEventListener('change', e => {
+  const el = e.target, k = el.dataset?.key;
+  if (el.type === 'checkbox' && k in state) { state[k] = el.checked; changed(); }
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]');
+  if (b) {
+    const g = b.closest('div[data-key]');
+    if (g) { state[g.dataset.key] = parseV(b.dataset.v); changed(); }
+    return;
+  }
+  const gl = e.target.closest('[data-glide]');
+  if (gl) { const [s, en, m] = gl.dataset.glide.split(',').map(Number); Object.assign(state, { gStart: s, gEnd: en, gMin: m }); changed(); return; }
+  if (e.target.matches('.picker input')) { state[e.target.dataset.key] = e.target.value; changed(); }
+});
+
+const consent = $('#consent');
+let xrSupported = false;
+function syncButtons() {
+  $('#startVR').disabled = !consent.checked || !xrSupported;
+  $('#startFS').disabled = !consent.checked;
+  $('#agree').disabled = !consent.checked;
+}
+consent.addEventListener('change', syncButtons);
+
+// ================= Screens =================
+// One screen at a time. The safety notice must be agreed before any other screen opens.
+const STEPS = [['light', 'Light'], ['sound', 'Sound'], ['aff', 'Affirmation'], ['session', 'Session']];
+let cur = 'welcome';
+const backStack = [];
+function showScreen(name) {
+  if (name !== 'welcome' && !consent.checked) name = 'welcome';
+  $$('.screen').forEach(s => s.hidden = s.dataset.screen !== name);
+  cur = name;
+  $('#topbar').hidden = name === 'welcome';
+  $('#navBack').hidden = name === 'home' || name === 'welcome';
+  $('#navJournal').hidden = name === 'journal';
+  const si = STEPS.findIndex(s => s[0] === name);
+  $$('.stepper').forEach(ol => ol.querySelectorAll('button').forEach((b, i) => {
+    b.classList.toggle('done', i < si);
+    if (i === si) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+  }));
+  if (name === 'journal') renderHistory();
+  window.scrollTo(0, 0);
+  const h = document.querySelector(`.screen[data-screen="${name}"] h1, .screen[data-screen="${name}"] h2`);
+  if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+}
+// Basic or Advanced settings; remembered on this device.
+let mode = (() => { try { return localStorage.getItem('gf-mode') || 'basic'; } catch { return 'basic'; } })();
+function setMode(m) {
+  mode = m;
+  try { localStorage.setItem('gf-mode', m); } catch {}
+  $$('[data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m));
+  $('#modeNote').textContent = m === 'basic'
+    ? 'Basic: one page with rate, color, brightness, length, breathing, background sound and ending.'
+    : 'Advanced: four steps with every option, including journeys, patterns, tones, drumming and affirmations.';
+  // If a settings screen is open, swap it for the other mode's settings in place.
+  if (cur === 'basic' || STEPS.some(s => s[0] === cur)) showScreen(m === 'basic' ? 'basic' : 'light');
+}
+document.addEventListener('click', e => {
+  const m = e.target.closest('[data-mode], [data-setmode]');
+  if (m) setMode(m.dataset.mode || m.dataset.setmode);
+});
+
+// Advanced settings that Basic doesn't show, so Basic can say when one is still switched on.
+const EXTRAS = [
+  ['rhythm', v => v === 'glide', 'a journey (gliding rate)', { rhythm: 'steady' }],
+  ['drift', v => v, 'drift', { drift: false }],
+  ['cj', v => v, 'a color journey', { cj: false }],
+  ['off', v => v !== '#000000', 'a between-flash color', { off: '#000000' }],
+  ['pattern', v => v !== 'full', 'a pattern', { pattern: 'full' }],
+  ['split', v => v !== 'both', 'a split-eye mode', { split: 'both' }],
+  ['dot', v => v, 'the focus dot', { dot: false }],
+  ['iso', v => v, 'isochronic tones', { iso: false }],
+  ['bin', v => v, 'binaural beats', { bin: false }],
+  ['drumOn', v => v, 'drumming', { drumOn: false }],
+  ['affOn', v => v, 'the affirmation', { affOn: false }],
+  ['lock', v => !v, 'unlocked timing', { lock: true }]
+];
+function updateExtras() {
+  const on = EXTRAS.filter(([k, test]) => test(state[k]));
+  $('#extras').hidden = !on.length;
+  if (on.length) {
+    const names = on.map(x => x[2]);
+    const list = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names.at(-1) : names[0];
+    $('#extrasText').textContent = `Also on from Advanced settings or the setup you picked: ${list}.`;
+  }
+}
+$('#clearExtras').addEventListener('click', () => {
+  EXTRAS.forEach(([k, test, , reset]) => { if (test(state[k])) Object.assign(state, reset); });
+  changed();
+});
+
+function go(name) {
+  if (name === 'settings') name = mode === 'basic' ? 'basic' : 'light';
+  if (name === cur) return;
+  backStack.push(cur);
+  showScreen(name);
+}
+function goBack() {
+  let prev = backStack.pop();
+  while (prev === 'welcome' && backStack.length) prev = backStack.pop();
+  showScreen(!prev || prev === 'welcome' ? 'home' : prev);
+}
+$$('.stepper').forEach(ol => {
+  ol.innerHTML = STEPS.map(([k, label], i) => `<li><button type="button" data-go="${k}">${i + 1}. ${label}</button></li>`).join('');
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-go]');
+  if (b) go(b.dataset.go);
+});
+$('#navBack').addEventListener('click', goBack);
+$('#agree').addEventListener('click', () => { if (consent.checked) { backStack.length = 0; showScreen('home'); } });
+
+// ================= Presets =================
+function loadCfg(cfg, label) {
+  Object.assign(state, DEFAULTS, cfg);
+  changed();
+  $('#readyFrom').textContent = label ? 'Journey · ' + label : 'Settings from your journal';
+  go('ready');
+}
+// Research-based setups. Every one: closed eyes, steady rhythm, frame-locked, no drift, masking sound, gentle wake-up.
+// Each cfg is complete enough to override anything left over from a previous setup (loadCfg starts from DEFAULTS).
+const BASE = { lock: true, refresh: 'max', drift: false, rhythm: 'steady', pattern: 'full', split: 'both', dot: false, off: '#000000', cj: false, ending: 'wake', affOn: false };
+const RESEARCH = [
+  { name: 'Lab standard', time: '~22 min',
+    why: 'Copies the strongest lab setup: steady 10 Hz white light on closed eyes for 20 minutes with masking noise. 10 Hz gave the most patterns, colors and motion across studies.',
+    cfg: { ...BASE, hz: 10, flash: '#ffffff', bright: 70, mins: 20, breathOn: true, breathRounds: 6, breathSec: 4, breathVol: 40, bgOn: true, bg: 'brown', bgVol: 30 } },
+  { name: 'First visions', time: '~14 min',
+    why: 'A gentler start for first sessions: the same proven 10 Hz at lower brightness, long enough (12 min) to get past the first patterns toward the point where scenes start to appear.',
+    cfg: { ...BASE, hz: 10, flash: '#ffffff', bright: 50, mins: 12, breathOn: true, breathRounds: 5, breathSec: 4, breathVol: 40, bgOn: true, bg: 'pink', bgVol: 30 } },
+  { name: 'Deep imagery', time: '~27 min',
+    why: 'Built for complex scenes, which peaked around 9 minutes in and keep coming with time: 25 minutes of steady 10 Hz in warm amber, which passes through eyelids well, with a longer calming lead-in.',
+    cfg: { ...BASE, hz: 10, flash: '#ff991a', bright: 65, mins: 25, breathOn: true, breathRounds: 8, breathSec: 4, breathVol: 40, bgOn: true, bg: 'brown', bgVol: 30 } },
+  { name: 'Find your frequency', time: '~17 min',
+    why: 'Each person\'s visions are tied to particular rates. This slowly steps from 12 Hz down to 8 Hz through the exact frame-locked rates. Note in the journal when it got strongest, then use that rate in Steady mode.',
+    cfg: { ...BASE, rhythm: 'glide', gStart: 12, gEnd: 8, gMin: 14, flash: '#ffffff', bright: 65, mins: 15, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40, bgOn: true, bg: 'pink', bgVol: 30 } },
+  { name: 'Drum-locked journey', time: '~22 min',
+    why: 'Steady drumming helped experienced practitioners turn inward in brain-scan research. Here the drum strikes on every second flash (5 beats a second at 10 Hz), so sound and light share one rhythm.',
+    cfg: { ...BASE, hz: 10, flash: '#ff991a', bright: 60, mins: 20, breathOn: true, breathRounds: 6, breathSec: 4, breathVol: 40, bgOn: true, bg: 'brown', bgVol: 20, drumOn: true, drumRate: 5, drumSync: true, drumVol: 55 } },
+  { name: 'Classic Ganzflicker', time: '~12 min', caution: true,
+    why: 'The red-and-black flicker at 7.5 Hz used in the large online Ganzflicker studies, with white noise. Red reaches through eyelids best, but saturated red flicker carries extra seizure risk, so brightness is kept moderate.',
+    cfg: { ...BASE, hz: 7.5, flash: '#ff1408', bright: 50, mins: 12, breathOn: false, bgOn: true, bg: 'white', bgVol: 30 } }
+];
+function renderResearch() {
+  const box = $('#research'); box.innerHTML = '';
+  RESEARCH.forEach(p => {
+    const b = document.createElement('button'); b.className = 'rset';
+    const t = document.createElement('b'); t.textContent = p.name;
+    const c = { ...DEFAULTS, ...p.cfg };
+    const total = c.mins * 60 + (c.breathOn ? c.breathRounds * 4 * c.breathSec : 0);
+    const tm = document.createElement('span'); tm.textContent = `${c.hz} Hz · ~${Math.round(total / 60)} min`; t.append(tm);
+    if (c.rhythm === 'glide') tm.textContent = `${c.gStart}→${c.gEnd} Hz · ~${Math.round(total / 60)} min`;
+    const w = document.createElement('small'); w.textContent = p.why;
+    b.append(t, w);
+    if (p.caution) { const c = document.createElement('small'); c.className = 'caution'; c.textContent = 'Higher risk if you might be light-sensitive.'; b.append(c); }
+    b.addEventListener('click', () => {
+      loadCfg(p.cfg, p.name);
+      $$('.rset').forEach(x => x.setAttribute('aria-pressed', x === b));
+    });
+    box.append(b);
+  });
+}
+function renderPresets() {
+  renderResearch();
+  $('#builtins').innerHTML = '';
+  BUILTINS.forEach(p => {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = p.name;
+    b.addEventListener('click', () => loadCfg(p.cfg, p.name));
+    $('#builtins').append(b);
+  });
+  const mine = store.get('gf-presets') || [];
+  $('#mine').innerHTML = '';
+  mine.forEach((p, i) => {
+    const wrap = document.createElement('span'); wrap.className = 'mine';
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = '★ ' + p.name;
+    b.addEventListener('click', () => loadCfg(p.cfg, p.name));
+    const d = document.createElement('button'); d.className = 'chip del'; d.textContent = '×'; d.setAttribute('aria-label', 'Delete ' + p.name);
+    d.addEventListener('click', () => {
+      if (!d.classList.contains('confirm')) { d.classList.add('confirm'); d.textContent = 'Delete?'; setTimeout(() => { d.classList.remove('confirm'); d.textContent = '×'; }, 3000); return; }
+      const list = store.get('gf-presets') || []; list.splice(i, 1); store.set('gf-presets', list); renderPresets(); toast('Setup deleted');
+    });
+    wrap.append(b, d); $('#mine').append(wrap);
+  });
+}
+$('#savePreset').addEventListener('click', () => {
+  const name = $('#presetName').value.trim();
+  if (!name) { $('#presetName').focus(); toast('Give the setup a name first'); return; }
+  const list = (store.get('gf-presets') || []).filter(p => p.name !== name);
+  list.push({ name, cfg: { ...state } });
+  store.set('gf-presets', list); $('#presetName').value = '';
+  renderPresets(); toast(`Saved “${name}”`);
+});
+
+// ================= Storage (IndexedDB) =================
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('ganzflicker', 2);
+    r.onupgradeneeded = () => {
+      const db = r.result;
+      if (!db.objectStoreNames.contains('aff')) db.createObjectStore('aff');
+      if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', { keyPath: 'id' });
+    };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+function tx(storeName, mode, fn) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const t = db.transaction(storeName, mode), s = t.objectStore(storeName);
+    const q = fn(s);
+    t.oncomplete = () => res(q?.result); t.onerror = () => rej(t.error);
+  }));
+}
+const dbPut = (s, v, k) => tx(s, 'readwrite', st => k === undefined ? st.put(v) : st.put(v, k)).catch(() => {});
+const dbGet = (s, k) => tx(s, 'readonly', st => st.get(k)).catch(() => null);
+const dbAll = s => tx(s, 'readonly', st => st.getAll()).catch(() => []);
+const dbDel = (s, k) => tx(s, 'readwrite', st => st.delete(k)).catch(() => {});
+
+// ================= Microphone recorder (affirmation + journal voice notes) =================
+function micError(e) {
+  if (!navigator.mediaDevices?.getUserMedia) return location.protocol === 'file:'
+    ? 'Recording isn\'t available when the page is opened as a file. Open it from your web address (…netlify.app).'
+    : 'This browser can\'t use the microphone on this page.';
+  const embedded = window.top !== window.self;
+  return ({
+    NotAllowedError: embedded
+      ? 'This page is running inside another page (such as the claude.ai viewer), which blocks the microphone. Open your own site address directly in the address bar.'
+      : 'Microphone access was denied. Tap the lock icon by the address, set Microphone to Allow, then reload.',
+    NotFoundError: 'No microphone was found on this device.',
+    NotReadableError: 'The microphone is busy in another app.'
+  }[e?.name]) || 'Couldn\'t start the microphone' + (e ? ` (${e.name})` : '') + '.';
+}
+function makeRecorder(btn, label, onStatus, onDone) {
+  let rec = null;
+  btn.addEventListener('click', async () => {
+    if (rec) { rec.stop(); return; }
+    let stream;
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw null;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    } catch (e) { onStatus(micError(e)); return; }
+    try { rec = new MediaRecorder(stream); } catch { stream.getTracks().forEach(t => t.stop()); onStatus('This browser can\'t record audio.'); return; }
+    const chunks = []; let secs = 0;
+    const timer = setInterval(() => { secs++; onStatus(`Recording… ${secs} s. Tap Stop when you're done.`); if (secs >= 180) rec?.stop(); }, 1000);
+    rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      clearInterval(timer); stream.getTracks().forEach(t => t.stop());
+      const b = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+      rec = null; btn.classList.remove('on'); btn.textContent = label;
+      if (b.size < 1000) { onStatus('That recording came out empty. Try again.'); return; }
+      onDone(b, secs);
+    };
+    rec.start(); btn.classList.add('on'); btn.textContent = '■ Stop';
+    onStatus('Recording… 0 s. Tap Stop when you\'re done.');
+  });
+}
+function playToggle(btn, getBlob, vol = 1) {
+  let a = null; const label = btn.textContent;
+  const reset = () => { a = null; btn.textContent = label; };
+  btn.addEventListener('click', () => {
+    if (a) { a.pause(); return reset(); }
+    const b = getBlob(); if (!b) return;
+    a = new Audio(URL.createObjectURL(b)); a.volume = typeof vol === 'function' ? vol() : vol;
+    a.onended = reset; a.play().catch(reset); btn.textContent = '■ Stop';
+  });
+}
+
+// ================= Affirmation =================
+let affBlob = null;
+const affStatus = m => $('#recStatus').textContent = m;
+function setAff(b, msg) { affBlob = b; $('#playBtn').disabled = !b; affStatus(msg); syncUI(); }
+dbGet('aff', 'rec').then(b => { if (b && !affBlob) setAff(b, 'Your saved affirmation is loaded. Tap Play back to hear it, or Record to replace it.'); });
+makeRecorder($('#recBtn'), '● Record', affStatus, (b, s) => { setAff(b, `Recorded ${s} s. Tap Play back to check it.`); dbPut('aff', b, 'rec'); });
+playToggle($('#playBtn'), () => affBlob, () => state.affVol / 100);
+$('#affFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  setAff(f, `Using ${f.name}. Tap Play back to check it.`); dbPut('aff', f, 'rec');
+});
+
+// ================= Sound synthesis =================
+// Loopable buffer: render a little extra and crossfade the tail into the head so the loop has no click.
+function loopBuffer(ctx, seconds, gen, channels = 1) {
+  const sr = ctx.sampleRate, len = Math.floor(sr * seconds), xf = Math.floor(sr * 0.25);
+  const buf = ctx.createBuffer(channels, len, sr);
+  for (let ch = 0; ch < channels; ch++) {
+    const tmp = new Float32Array(len + xf);
+    gen(tmp, sr, ch);
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = tmp[i];
+    for (let i = 0; i < xf; i++) { const k = (i / xf) * Math.PI / 2; d[i] = tmp[i] * Math.sin(k) + tmp[len + i] * Math.cos(k); }
+  }
+  return buf;
+}
+function pinkGen() {
+  let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  return () => { const w = Math.random()*2-1;
+    b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759; b2=0.96900*b2+w*0.1538520;
+    b3=0.86650*b3+w*0.3104856; b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980;
+    const o=(b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11; b6=w*0.115926; return o; };
+}
+function brownGen() { let l = 0; return () => { l = (l + 0.02 * (Math.random()*2-1)) / 1.02; return l * 3.5; }; }
+
+function buildBackground(ctx, type, out) {
+  const nodes = [];
+  const src = buf => { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; nodes.push(s); return s; };
+  if (type === 'white' || type === 'pink' || type === 'brown') {
+    const g = type === 'white' ? () => (Math.random()*2-1) * 0.5 : type === 'pink' ? pinkGen() : brownGen();
+    src(loopBuffer(ctx, 12, d => { for (let i = 0; i < d.length; i++) d[i] = g(); }, 2)).connect(out);
+  } else if (type === 'rain') {
+    // Soft hiss plus thousands of tiny decaying droplets, in stereo.
+    const buf = loopBuffer(ctx, 8, (d, sr) => {
+      const p = pinkGen();
+      for (let i = 0; i < d.length; i++) d[i] = p() * 0.35;
+      const drops = Math.floor(d.length / sr * 220);
+      for (let n = 0; n < drops; n++) {
+        const at = Math.floor(Math.random() * d.length), amp = Math.pow(Math.random(), 3) * 0.6;
+        const dec = sr * (0.003 + Math.random() * 0.012);
+        for (let j = 0; j < dec * 5 && at + j < d.length; j++) d[at + j] += (Math.random()*2-1) * amp * Math.exp(-j / dec);
+      }
+    }, 2);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 6500;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 250;
+    src(buf).connect(hp).connect(lp).connect(out);
+  } else if (type === 'ocean') {
+    // Brown-noise surf shaped into slow swells, with a hiss on each crest; left and right waves offset.
+    const buf = loopBuffer(ctx, 16, (d, sr, ch) => {
+      const b = brownGen(), p = pinkGen(), off = ch ? 0.37 : 0;
+      for (let i = 0; i < d.length; i++) {
+        const t = i / sr, ph = (t / 8 + off) % 1;
+        const swell = Math.pow(0.5 - 0.5 * Math.cos(2 * Math.PI * ph), 1.6);
+        d[i] = b() * (0.25 + 0.75 * swell) + p() * 0.25 * Math.pow(swell, 4);
+      }
+    }, 2);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
+    src(buf).connect(lp).connect(out);
+  } else if (type === 'drone') {
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700; lp.Q.value = 2;
+    const mix = ctx.createGain(); mix.gain.value = 0.22;
+    [[55, 'sine', 1], [82.4, 'sine', 0.7], [110.6, 'triangle', 0.5], [164.8, 'sine', 0.25], [55.3, 'sawtooth', 0.15]].forEach(([f, type, g]) => {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.value = f;
+      const og = ctx.createGain(); og.gain.value = g; o.connect(og).connect(lp); nodes.push(o);
+    });
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 300; lfo.connect(lfoG).connect(lp.frequency); nodes.push(lfo);
+    lp.connect(mix).connect(out);
+  }
+  nodes.forEach(n => n.start());
+  return nodes;
+}
+
+function chime(ctx, out, when, base) {
+  [[1, 0.5], [2.76, 0.18], [5.4, 0.08], [0.5, 0.15]].forEach(([m, g]) => {
+    const o = ctx.createOscillator(); o.frequency.value = base * m;
+    const e = ctx.createGain(); e.gain.setValueAtTime(0, when);
+    e.gain.linearRampToValueAtTime(g, when + 0.01);
+    e.gain.exponentialRampToValueAtTime(0.0001, when + 4.5);
+    o.connect(e).connect(out); o.start(when); o.stop(when + 4.6);
+  });
+}
+
+// Frame drum: a pitched low thump (skin resonance falling in pitch) plus a short filtered-noise slap.
+function drumHit(ctx, out, when, vel = 1) {
+  const o = ctx.createOscillator(), og = ctx.createGain();
+  o.frequency.setValueAtTime(115, when);
+  o.frequency.exponentialRampToValueAtTime(52, when + 0.12);
+  og.gain.setValueAtTime(0, when);
+  og.gain.linearRampToValueAtTime(0.9 * vel, when + 0.004);
+  og.gain.exponentialRampToValueAtTime(0.0001, when + 0.55);
+  o.connect(og).connect(out); o.start(when); o.stop(when + 0.6);
+  const len = Math.floor(ctx.sampleRate * 0.08), nb = ctx.createBuffer(1, len, ctx.sampleRate), d = nb.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len / 6));
+  const n = ctx.createBufferSource(); n.buffer = nb;
+  const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 260; bp.Q.value = 0.9;
+  const ng = ctx.createGain(); ng.gain.value = 0.45 * vel;
+  n.connect(bp).connect(ng).connect(out); n.start(when);
+}
+
+$('#drumPreview').addEventListener('click', () => {
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  const ctx = new AC(), g = ctx.createGain(); g.gain.value = state.drumVol / 100; g.connect(ctx.destination);
+  const step = 1 / state.drumRate;
+  for (let t = 0.05; t < 5; t += step) drumHit(ctx, g, ctx.currentTime + t, 0.85 + Math.random() * 0.15);
+  setTimeout(() => ctx.close().catch(() => {}), 5800);
+});
+
+let bgPrev = null;
+$('#bgPreview').addEventListener('click', () => {
+  if (bgPrev) { bgPrev.close().catch(() => {}); bgPrev = null; $('#bgPreview').textContent = '▶ Preview 5 seconds'; return; }
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  const ctx = new AC(), g = ctx.createGain(); g.gain.value = state.bgVol / 100; g.connect(ctx.destination);
+  buildBackground(ctx, state.bg, g); bgPrev = ctx; $('#bgPreview').textContent = '■ Stop preview';
+  setTimeout(() => { if (bgPrev === ctx) $('#bgPreview').click(); }, 5000);
+});
+
+// Schedules a smooth change on an audio parameter, but only when the target actually changes.
+// Re-scheduling the same value every frame piles up automation events, which can make audio stutter on some devices.
+function ramp(param, v, at, tc) {
+  if (param._last !== undefined && Math.abs(param._last - v) < 1e-3) return;
+  param._last = v;
+  param.setTargetAtTime(v, at, tc);
+}
+
+// The VR lobby creates one audio context at the Enter tap and reuses it for every session it starts.
+let sharedAudioCtx = null;
+
+// ================= Session engine =================
+// One timeline drives light, tones, background, affirmation and the ending, for both VR and fullscreen.
+function createSession(mode) {
+  const cfg = { ...state };
+  const total = cfg.mins * 60;
+  const W = Math.min(90, total * 0.3);           // wake-up window
+  const sleepLen = cfg.sleepMin * 60;
+  const flashRGB = hexRGB(cfg.flash), offRGB = hexRGB(cfg.off), splitRGB = hexRGB(cfg.splitColor), dotRGB = hexRGB(cfg.dotColor);
+  const pal = PALETTES[cfg.palette].colors.map(hexRGB);
+  let phase = 0, last = null, start = null, chimed = false;
+  // Fourfold breath intro: B seconds of guided breathing before the flicker, then EASE seconds of crossfade.
+  const step = cfg.breathSec, cycle = 4 * step;
+  const B = cfg.breathOn ? cfg.breathRounds * cycle : 0;
+  const EASE = cfg.breathOn ? 2 * cycle : 0;
+  const S = { cfg, mode, t: 0, T: 0, total: B + total, done: false, startedAt: new Date() };
+  const ease = f => f * f * (3 - 2 * f);
+  // 0..1 breath shape: in (rise), hold full, out (fall), hold empty.
+  function breathShape(T) {
+    const p = (T % cycle) / step, i = Math.floor(p), f = p - i;
+    return [ease(f), 1, 1 - ease(f), 0][i];
+  }
+
+  // ---- audio graph (built inside the Start tap so the browser allows it) ----
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const A = {};
+  try {
+    if (AC) {
+      const ctx = A.ctx = sharedAudioCtx || new AC(); ctx.resume?.();
+      A.master = ctx.createGain(); A.master.connect(ctx.destination);
+      A.tones = ctx.createGain(); A.tones.gain.value = 0; A.tones.connect(A.master);
+      A.bg = ctx.createGain(); A.bg.gain.value = 0; A.bg.connect(A.master);
+      A.aff = ctx.createGain(); A.aff.gain.value = cfg.affVol / 100; A.aff.connect(A.master);
+      if (cfg.iso) {
+        A.isoOsc = ctx.createOscillator(); A.isoOsc.frequency.value = cfg.pitch;
+        A.isoGate = ctx.createGain(); A.isoGate.gain.value = 0;
+        A.isoOsc.connect(A.isoGate).connect(A.tones); A.isoOsc.start();
+      }
+      if (cfg.bin) {
+        const merge = ctx.createChannelMerger(2), mix = ctx.createGain(); mix.gain.value = cfg.iso ? 0.6 : 1;
+        A.binL = ctx.createOscillator(); A.binR = ctx.createOscillator();
+        A.binL.frequency.value = cfg.pitch; A.binR.frequency.value = cfg.pitch + 10;
+        A.binL.connect(merge, 0, 0); A.binR.connect(merge, 0, 1);
+        merge.connect(mix).connect(A.tones); A.binL.start(); A.binR.start();
+      }
+      if (cfg.bgOn) {
+        let out = A.bg;
+        if (cfg.bgSwell) {
+          // Swell: a very slow sine wave on the volume, running inside the audio engine so it is perfectly smooth.
+          // Volume moves between about 30% and 100% of the setting.
+          const sw = ctx.createGain(); sw.gain.value = 0.65; sw.connect(A.bg);
+          const lfo = ctx.createOscillator(); lfo.frequency.value = 1 / cfg.bgSwellSec;
+          const depth = ctx.createGain(); depth.gain.value = 0.35;
+          lfo.connect(depth).connect(sw.gain); lfo.start();
+          out = sw;
+        }
+        buildBackground(ctx, cfg.bg, out);
+      }
+      if (cfg.drumOn) { A.drum = ctx.createGain(); A.drum.gain.value = 0; A.drum.connect(A.master); A.onsets = 0; A.prevOn = false; }
+      if (cfg.breathOn) {
+        // Breath guide: a soft two-note pad that swells with the inhale and a quiet chime at each new breath.
+        A.breath = ctx.createGain(); A.breath.gain.value = 0;
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+        A.breathOsc = [196, 293.66].map(f => { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(lp); o.start(); return o; });
+        lp.connect(A.breath).connect(A.master);
+        A.breathChime = ctx.createGain(); A.breathChime.gain.value = 0.25 * cfg.breathVol / 100; A.breathChime.connect(A.master);
+        A.lastStep = -1;
+      }
+      if (cfg.affOn && affBlob) {
+        A.affNext = cfg.affWhen === 'second' ? total / 2 : 3;
+        affBlob.arrayBuffer().then(ab => ctx.decodeAudioData(ab)).then(b => A.affBuf = b).catch(() => {});
+      }
+    }
+  } catch {}
+
+  function frequencyAt(t) {
+    let hz = cfg.hz;
+    if (cfg.rhythm === 'glide') {
+      const u = clamp01(t / (cfg.gMin * 60)), e = u * u * (3 - 2 * u);
+      hz = cfg.gStart + (cfg.gEnd - cfg.gStart) * e;
+    }
+    if (cfg.drift) hz += Math.sin(t * 0.21) * 0.6 + Math.sin(t * 0.077) * 0.4;
+    if (cfg.ending === 'wake' && t > total - W) {
+      const u = clamp01((t - (total - W)) / W);
+      hz += (12 - hz) * u;
+    }
+    return Math.max(3, Math.min(16, hz));
+  }
+  function flashAt(t) {
+    if (!cfg.cj) return flashRGB;
+    const n = pal.length, pos = (t / (cfg.cycle * 60)) * n, i = Math.floor(pos) % n, f = pos - Math.floor(pos);
+    const e = f * f * (3 - 2 * f), a = pal[i], b = pal[(i + 1) % n];
+    return a.map((v, k) => v + (b[k] - v) * e);
+  }
+
+  const L = { k: 0, N: 0 };   // frame-locked state: frame index within the current cycle, frames per cycle
+  S.frame = (nowMs, refresh) => {
+    const now = nowMs / 1000;
+    if (start === null) start = last = now;
+    const T = S.T = now - start, dt = Math.min(now - last, 0.1); last = now;
+    const t = S.t = T - B;     // flicker time: negative during the breath intro
+    let hz = frequencyAt(Math.max(0, t)), on;
+    if (t < 0) {
+      on = false;              // no flicker yet
+    } else if (cfg.lock && refresh) {
+      // Each cycle is a whole number of screen frames, split evenly between on and off.
+      // The cycle length is only recalculated at the end of a cycle, so journeys step cleanly between exact rates.
+      S.refresh = refresh;
+      if (!L.N) L.N = exact(hz, refresh).n;
+      on = L.k < Math.round(L.N / 2);
+      hz = refresh / L.N;
+      L.k += Math.max(1, Math.round(dt * refresh));   // a dropped frame still occupied its slot on screen
+      while (L.k >= L.N) { L.k -= L.N; L.N = exact(frequencyAt(t), refresh).n; }
+    } else {
+      phase = (phase + hz * dt) % 1;
+      on = phase < 0.5;
+    }
+    // After a breath intro the flicker fades in slowly from nothing; otherwise it starts dim and reaches full in 4 s.
+    const fadeIn = B ? ease(clamp01(t / EASE)) : Math.min(1, 0.25 + 0.75 * t / 4);
+    const endLight = cfg.ending === 'wake' ? (total - t) / W : cfg.ending === 'sleep' ? (total - t) / 20 : (total - t) / 4;
+    const light = t < 0 || t >= total ? 0 : clamp01(fadeIn) * clamp01(endLight);
+    // Breath guide level: full during the intro, fading out over the crossfade.
+    const guide = B ? (t < 0 ? 1 : 1 - ease(clamp01(t / EASE))) : 0;
+    const bshape = guide > 0 ? breathShape(T) : 0;
+    // Background sounds start with the breath; tones and drum come in with the flicker.
+    const flickerIn = B ? ease(clamp01(t / EASE)) : 1;
+    let sound = Math.min(1, T / 4);
+    if (cfg.ending === 'sleep') sound *= t < total ? 1 : clamp01(1 - (t - total) / sleepLen);
+    else sound *= clamp01(cfg.ending === 'wake' ? (total - t) / W : (total - t) / 4);
+    const endAt = cfg.ending === 'wake' ? total + 6 : cfg.ending === 'sleep' ? total + sleepLen : total;
+    if (t >= endAt) S.done = true;
+
+    // ---- audio follows the same clock ----
+    if (A.ctx) {
+      const at = A.ctx.currentTime;
+      ramp(A.tones.gain, cfg.toneVol / 100 * 0.5 * sound * flickerIn, at, 0.05);
+      if (A.breath) {
+        ramp(A.breath.gain, 0.16 * cfg.breathVol / 100 * bshape * guide, at, 0.08);
+        A.breathOsc.forEach((o, i) => ramp(o.frequency, [196, 293.66][i] * (1 + 0.05 * bshape), at, 0.1));
+        const stepIdx = Math.floor(T / step);
+        if (guide > 0.2 && stepIdx !== A.lastStep && stepIdx % 4 === 0) chime(A.ctx, A.breathChime, at + 0.02, 660);
+        A.lastStep = stepIdx;
+      }
+      ramp(A.bg.gain, cfg.bgVol / 100 * sound, at, 0.08);
+      if (A.isoGate) ramp(A.isoGate.gain, on && t < total + (cfg.ending === 'sleep' ? sleepLen : 0) ? 1 : 0, at, 0.004);
+      if (A.binR) ramp(A.binR.frequency, cfg.pitch + hz, at, 0.05);
+      if (cfg.affFade) ramp(A.aff.gain, cfg.affVol / 100 * (1 - 0.8 * clamp01(t / total)), at, 0.2);
+      if (A.affBuf && !A.affPlaying && t >= A.affNext && t < total - 2) {
+        const s = A.ctx.createBufferSource(); s.buffer = A.affBuf; s.connect(A.aff);
+        s.onended = () => { A.affPlaying = false; A.affNext = S.t + cfg.affGap; };
+        A.affPlaying = true; A.affSrc = s; s.start();
+      }
+      if (t >= total - 1.5) { try { A.affSrc?.stop(); } catch {} A.affBuf = null; }
+      if (A.drum) {
+        ramp(A.drum.gain, cfg.drumVol / 100 * sound * flickerIn, at, 0.05);
+        const playing = t >= 0 && (t < total || cfg.ending === 'sleep');
+        const callback = cfg.ending === 'wake' && t > total - W;
+        const vel = () => 0.85 + Math.random() * 0.15;
+        if (cfg.drumSync && !callback) {
+          // Strike on every n-th flash, where n puts the beat closest to the chosen tempo.
+          if (on && !A.prevOn && playing) {
+            const n = Math.max(1, Math.round(hz / cfg.drumRate));
+            if (A.onsets++ % n === 0) drumHit(A.ctx, A.drum, at, vel());
+          }
+          A.nextBeat = null;
+        } else {
+          // Scheduled slightly ahead on the audio clock so the beat stays even regardless of frame timing.
+          if (A.nextBeat == null || A.nextBeat < at) A.nextBeat = at + 0.03;
+          while (A.nextBeat < at + 0.12) {
+            const tb = t + (A.nextBeat - at);
+            if (playing && tb < (cfg.ending === 'sleep' ? total + sleepLen : total)) drumHit(A.ctx, A.drum, A.nextBeat, vel());
+            // Callback: about 28 s of slow single beats, then a fast roll for the rest of the wake-up.
+            const rate = callback ? (tb - (total - W) < 28 ? 1 : 7.5) : cfg.drumRate;
+            A.nextBeat += (1 / rate) * (1 + (Math.random() - 0.5) * 0.02);
+          }
+        }
+        A.prevOn = on;
+      }
+      if (cfg.ending === 'wake' && !chimed && t >= total) { chimed = true; chime(A.ctx, A.master, at + 0.05, 528); chime(A.ctx, A.master, at + 2.2, 396); }
+    }
+
+    // ---- colors for this frame ----
+    const k = cfg.bright / 100 * light;
+    // Breath glow: a steady, non-flickering light in the flash color that rises and falls with the breath.
+    const gk = guide * (0.05 + 0.95 * bshape) * 0.45 * cfg.bright / 100;
+    const glow = flashAt(0).map(v => v * gk);
+    const fl = flashAt(Math.max(0, t)).map((v, i) => v * k + glow[i]), of = offRGB.map((v, i) => v * k + glow[i]);
+    const dotShown = cfg.dot && light > 0 && (cfg.dotMode === 'steady' || (cfg.dotMode === 'with') === on);
+    const dk = Math.max(cfg.bright / 100, 0.3) * Math.max(light, 0.3);
+    return {
+      t, hz, on, light,
+      eye(i) {
+        const eOn = cfg.split === 'alt' && i === 1 ? !on : on;
+        const eFl = cfg.split === 'colors' && i === 1 ? splitRGB.map((v, j) => v * k + glow[j]) : fl;
+        return { on: eOn, flash: eFl, off: of };
+      },
+      dot: dotShown ? { rgb: dotRGB.map(v => v * dk), deg: cfg.dotSize } : null,
+      pattern: { full: 0, spiral: 1, rings: 2, tunnel: 3 }[cfg.pattern], ptime: t * cfg.pspeed
+    };
+  };
+  S.stopAudio = () => {
+    if (!A.ctx) return;
+    try { A.master.gain.setTargetAtTime(0, A.ctx.currentTime, 0.08); } catch {}
+    if (A.ctx === sharedAudioCtx) setTimeout(() => { try { A.master.disconnect(); } catch {} }, 400);
+    else setTimeout(() => A.ctx.close().catch(() => {}), 400);
+  };
+  return S;
+}
+
+// ================= Renderer (WebGL, shared by VR and fullscreen) =================
+const VS = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
+const FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uC; uniform float uPPR;
+uniform vec3 uFlash, uOff; uniform float uOn;
+uniform int uPat; uniform float uT;
+uniform vec3 uDotCol; uniform float uDotR; uniform float uDotA;
+const float TAU = 6.2831853;
+void main(){
+  vec2 q = (gl_FragCoord.xy - uC) / uPPR;
+  float r = length(q); float a = atan(q.y, q.x);
+  float m = 1.0;
+  if (uPat == 1) { m = 0.5 + 0.5 * sin(TAU * (a / TAU * 3.0 + log(r + 0.02) * 1.3 - uT * 0.15)); }
+  else if (uPat == 2) { m = 0.5 + 0.5 * sin(TAU * (r * 6.0 - uT * 0.5)); }
+  else if (uPat == 3) {
+    m = 0.5 + 0.5 * sin(TAU * (0.3 / (r + 0.06) - uT * 0.4)) * sin(a * 8.0 + uT * 0.3);
+    m = mix(0.5, m, smoothstep(0.0, 0.12, r));
+  }
+  if (uPat > 0) m = smoothstep(0.3, 0.7, m);
+  vec3 col = mix(uOff, uFlash, m * uOn);
+  if (uDotA > 0.5) {
+    float d = length(gl_FragCoord.xy - uC);
+    col = mix(col, uDotCol, 1.0 - smoothstep(uDotR - 0.75, uDotR + 0.75, d));
+  }
+  gl_FragColor = vec4(col, 1.0);
+}`;
+function makeRenderer(gl) {
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+  const pr = gl.createProgram();
+  gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = n => gl.getUniformLocation(pr, n);
+  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA'].map(n => [n, loc(n)]));
+  const aP = gl.getAttribLocation(pr, 'p');
+  return {
+    // Draw one eye (or the whole screen) into the given viewport.
+    draw(F, eyeIdx, vp, cx, cy, ppr) {
+      gl.useProgram(pr);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 2, gl.FLOAT, false, 0, 0);
+      gl.viewport(vp.x, vp.y, vp.width, vp.height);
+      const E = F.eye(eyeIdx);
+      gl.uniform2f(U.uC, cx, cy); gl.uniform1f(U.uPPR, ppr);
+      gl.uniform3fv(U.uFlash, E.flash); gl.uniform3fv(U.uOff, E.off); gl.uniform1f(U.uOn, E.on ? 1 : 0);
+      gl.uniform1i(U.uPat, F.pattern); gl.uniform1f(U.uT, F.ptime);
+      if (F.dot) {
+        gl.uniform1f(U.uDotA, 1); gl.uniform3fv(U.uDotCol, F.dot.rgb);
+        gl.uniform1f(U.uDotR, Math.max(1.5, Math.tan(F.dot.deg * Math.PI / 360) * ppr));
+      } else gl.uniform1f(U.uDotA, 0);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+  };
+}
+
+// Measures the screen's refresh rate from frame timing: median of the first frames, snapped to common rates.
+function makeRefreshMeter() {
+  const dts = []; let last = null, rate = null;
+  return now => {
+    if (rate) return rate;
+    if (last !== null) { const d = now - last; if (d > 2 && d < 40) dts.push(d); }
+    last = now;
+    if (dts.length < 40) return null;
+    const med = dts.sort((a, b) => a - b)[20], raw = 1000 / med;
+    const known = [60, 72, 75, 80, 90, 100, 120, 144, 165];
+    const snap = known.find(k => Math.abs(k - raw) / k < 0.04);
+    return rate = snap || Math.round(raw);
+  };
+}
+
+// ================= Fullscreen mode =================
+const stage = $('#stage'), fsCanvas = $('#fsCanvas');
+let fsGL = null, fsR = null, raf = 0, fsSession = null, running = false, xrSession = null;
+function startFS() {
+  if (running) return;
+  try { stage.requestFullscreen?.().catch(() => {}); } catch {}
+  stage.hidden = false;
+  try {
+    if (!fsGL) { fsGL = fsCanvas.getContext('webgl'); fsR = makeRenderer(fsGL); }
+  } catch (e) { stage.hidden = true; toast('This browser can\'t draw the flicker: ' + e.message); return; }
+  running = true;
+  const S = fsSession = createSession('fullscreen');
+  navigator.wakeLock?.request('screen').then(l => S.lock = l).catch(() => {});
+  const meter = makeRefreshMeter();
+  const loop = now => {
+    if (fsSession !== S) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.round(fsCanvas.clientWidth * dpr), h = Math.round(fsCanvas.clientHeight * dpr);
+    if (fsCanvas.width !== w || fsCanvas.height !== h) { fsCanvas.width = w; fsCanvas.height = h; }
+    const F = S.frame(now, meter(now));
+    if (S.done) return stopFS('finished');
+    fsR.draw(F, 0, { x: 0, y: 0, width: w, height: h }, w / 2, h / 2, Math.min(w, h) * 0.9);
+    raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+}
+function stopFS(reason = 'stopped') {
+  const S = fsSession; if (!S) return;
+  fsSession = null; running = false; cancelAnimationFrame(raf);
+  S.stopAudio(); try { S.lock?.release(); } catch {}
+  stage.hidden = true;
+  try { document.fullscreenElement && document.exitFullscreen(); } catch {}
+  sessionEnded(S, reason);
+}
+stage.addEventListener('pointerdown', () => stopFS());
+window.addEventListener('keydown', () => fsSession && stopFS());
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && fsSession) stopFS(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && fsSession) stopFS(); });
+$('#startFS').addEventListener('click', startFS);
+
+// ================= VR mode =================
+(async () => {
+  xrSupported = !!navigator.xr;
+  let says = false;
+  try { says = xrSupported && await navigator.xr.isSessionSupported('immersive-vr'); } catch {}
+  $('#xrNote').innerHTML = !xrSupported
+    ? 'This browser has no VR support. On a Quest, open this page in the Meta Quest Browser, or use <code>Start fullscreen</code>.'
+    : says ? 'VR is available. In the headset, press any controller button to stop.'
+    : 'The browser says VR isn\'t available right now, but you can still try <code>Start in VR</code>. If it fails, fully close the Quest browser and reopen this page.';
+  syncButtons();
+})();
+
+$('#startVR').addEventListener('click', async () => {
+  if (running) return;
+  // Ask for VR first thing in the tap, before any other work, so the headset counts it as a direct tap.
+  let request;
+  try { request = navigator.xr.requestSession('immersive-vr'); } catch (e) { request = Promise.reject(e); }
+  let S = null;
+  try { S = createSession('vr'); } catch {}
+  let session;
+  try { session = await request; }
+  catch (e) {
+    S?.stopAudio();
+    const embedded = window.top !== window.self;
+    $('#xrNote').textContent = 'The headset refused to start VR (' + e.message + '). ' + (embedded
+      ? 'This page is running inside another page (such as the claude.ai viewer), which isn\'t allowed to use VR. Open your own site address (…netlify.app) directly in the address bar.'
+      : 'Fully close the Quest browser (not just the tab), reopen this page and try again. If it still fails, restart the headset.');
+    return;
+  }
+  xrSession = session; running = true;
+  let frames = 0, err = null, reason = 'stopped';
+  const end = why => { if (why) reason = why; try { session.end(); } catch {} };
+  session.addEventListener('select', () => end('stopped'));
+  session.addEventListener('squeeze', () => end('stopped'));
+  session.addEventListener('end', () => {
+    xrSession = null; running = false; S?.stopAudio();
+    $('#xrNote').textContent = err
+      ? 'VR stopped after ' + frames + ' frames because of an error: ' + err + '. Send this message to Claude to fix it.'
+      : frames === 0
+        ? 'VR opened but the page was never allowed to draw (0 frames). Open the page from your own site address instead of inside claude.ai, or use Start fullscreen.'
+        : 'Last VR session ran at ' + (S?.refresh ? S.refresh + ' Hz refresh' : 'an unknown refresh rate') +
+          (S?.cfg.refresh !== 'max' && S?.refresh && +S.cfg.refresh !== Math.round(S.refresh) ? ' (the headset didn\'t offer ' + S.cfg.refresh + ' Hz)' : '') +
+          '. Press any controller button to stop a session.';
+    if (frames > 0 && S) sessionEnded(S, reason);
+  });
+
+  let gl, R;
+  try {
+    const canvas = document.createElement('canvas');
+    gl = canvas.getContext('webgl', { xrCompatible: true });
+    await gl.makeXRCompatible?.();
+    session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+    R = makeRenderer(gl);
+  } catch (e) { err = e.message; return end(); }
+
+  let viewerSpace = null;
+  session.requestReferenceSpace('viewer').then(s => viewerSpace = s).catch(() => {});
+  const meter = makeRefreshMeter();
+  const mul = (m, v) => [0,1,2,3].map(i => m[i]*v[0] + m[4+i]*v[1] + m[8+i]*v[2] + m[12+i]*v[3]);
+  const P = [0, 0, -2, 1];   // a point 2 m straight ahead: the center of patterns and the dot, so both eyes converge on it
+  const frame = (now, xrFrame) => {
+    if (xrSession !== session) return;
+    try {
+      // The headset reports its exact refresh rate; fall back to measuring it.
+      const F = S.frame(now, session.frameRate || meter(now));
+      if (S.done) return end('finished');
+      const layer = session.renderState.baseLayer;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+      const pose = viewerSpace && xrFrame.getViewerPose(viewerSpace);
+      if (pose) {
+        pose.views.forEach((view, i) => {
+          const vp = layer.getViewport(view), pm = view.projectionMatrix;
+          const c = mul(pm, mul(view.transform.inverse.matrix, P));
+          const cx = vp.x + (c[0] / c[3] * 0.5 + 0.5) * vp.width;
+          const cy = vp.y + (c[1] / c[3] * 0.5 + 0.5) * vp.height;
+          const eyeIdx = view.eye === 'right' ? 1 : view.eye === 'left' ? 0 : i;
+          R.draw(F, eyeIdx, vp, cx, cy, pm[0] * vp.width / 2);
+        });
+      } else {
+        const E = F.eye(0), c = E.on ? E.flash : E.off;
+        gl.clearColor(c[0], c[1], c[2], 1); gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+      frames++;
+    } catch (e) { err = e.message; return end(); }
+    session.requestAnimationFrame(frame);
+  };
+  session.requestAnimationFrame(frame);
+  setTimeout(() => { if (xrSession === session && frames === 0) end(); }, 3000);
+  try {
+    const rates = [...(session.supportedFrameRates || [])];
+    if (rates.length) {
+      const want = S.cfg.refresh === 'max' || !rates.includes(+S.cfg.refresh) ? Math.max(...rates) : +S.cfg.refresh;
+      session.updateTargetFrameRate(want).catch(() => {});
+    }
+  } catch {}
+});
+
+// ================= Journal & history =================
+let journalEntry = null, jRating = 0, jVoice = null;
+async function sessionEnded(S, reason) {
+  const entry = await logEntry(S, reason);
+  if (entry && entry.secs >= 20) openJournal(entry);
+}
+async function logEntry(S, reason) {
+  const secs = Math.round(Math.min(S.T, S.total));
+  if (secs < 5) return null;
+  const entry = { id: S.startedAt.getTime(), date: S.startedAt.toISOString(), secs, planned: S.cfg.mins, mode: S.mode,
+    reason: reason === 'finished' ? 'finished' : 'stopped early', cfg: S.cfg, refresh: S.refresh || null, rating: 0, note: '', voice: null };
+  await dbPut('sessions', entry);
+  renderHistory();
+  return entry;
+}
+function openJournal(entry) {
+  journalEntry = entry; jRating = entry.rating || 0; jVoice = entry.voice || null;
+  $('#jSum').textContent = fmtDate(entry.date) + ' · ' + fmtDur(entry.secs) + ' · ' + describe(entry.cfg);
+  $('#jText').value = entry.note || '';
+  $('#jPlay').disabled = !jVoice;
+  $('#jRecStatus').textContent = jVoice ? 'Voice note attached. Record again to replace it.' : 'Speak instead of typing, if you prefer.';
+  paintStars();
+  $('#journal').hidden = false;
+  setTimeout(() => $('#jText').focus(), 50);
+}
+function paintStars() { $$('#jStars .chip').forEach(b => b.setAttribute('aria-pressed', +b.dataset.r <= jRating)); }
+$('#jStars').addEventListener('click', e => { const b = e.target.closest('[data-r]'); if (!b) return; jRating = +b.dataset.r; paintStars(); });
+makeRecorder($('#jRec'), '● Voice note', m => $('#jRecStatus').textContent = m, (b, s) => {
+  jVoice = b; $('#jPlay').disabled = false; $('#jRecStatus').textContent = `Voice note recorded (${s} s).`;
+});
+playToggle($('#jPlay'), () => jVoice);
+$('#jSkip').addEventListener('click', () => { $('#journal').hidden = true; journalEntry = null; });
+$('#jSave').addEventListener('click', async () => {
+  if (!journalEntry) return;
+  Object.assign(journalEntry, { rating: jRating, note: $('#jText').value.trim(), voice: jVoice });
+  await dbPut('sessions', journalEntry);
+  $('#journal').hidden = true; journalEntry = null;
+  renderHistory(); toast('Saved to your journal');
+});
+
+const fmtDate = iso => new Date(iso).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const fmtDur = s => s < 60 ? s + ' s' : Math.round(s / 60) + ' min';
+let showAll = false;
+$('#showAll').addEventListener('click', () => { showAll = true; renderHistory(); });
+
+async function renderHistory() {
+  const all = (await dbAll('sessions')).sort((a, b) => b.id - a.id);
+  const box = $('#entries'); box.innerHTML = '';
+  const totalMin = Math.round(all.reduce((s, e) => s + e.secs, 0) / 60);
+  const rated = all.filter(e => e.rating);
+  $('#stats').innerHTML = all.length
+    ? `<span><b>${all.length}</b> session${all.length > 1 ? 's' : ''}</span><span><b>${totalMin}</b> min total</span>` +
+      (rated.length ? `<span>average visuals <b>${(rated.reduce((s, e) => s + e.rating, 0) / rated.length).toFixed(1)}</b> / 5</span>` : '')
+    : '';
+  const bestBox = $('#bestBox'); bestBox.innerHTML = '';
+  if (rated.length >= 2) {
+    const best = [...rated].sort((a, b) => b.rating - a.rating || b.id - a.id)[0];
+    const d = document.createElement('div'); d.className = 'best';
+    const p1 = document.createElement('p'); p1.innerHTML = '<b>Strongest visuals so far</b> <span class="rating"></span>';
+    p1.querySelector('.rating').textContent = '★'.repeat(best.rating);
+    const p2 = document.createElement('p'); p2.className = 'entry-sum'; p2.textContent = describe(best.cfg) + ' · ' + fmtDate(best.date);
+    const b = document.createElement('button'); b.className = 'chip'; b.style.justifySelf = 'start'; b.textContent = 'Use these settings';
+    b.addEventListener('click', () => { loadCfg(best.cfg); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    d.append(p1, p2, b); bestBox.append(d);
+  }
+  if (!all.length) {
+    box.innerHTML = '<p class="empty">No sessions yet. When a session ends, you can rate it and note what you saw, and it shows up here.</p>';
+    $('#showAll').hidden = true; return;
+  }
+  const list = showAll ? all : all.slice(0, 8);
+  $('#showAll').hidden = showAll || all.length <= 8;
+  list.forEach(e => {
+    const card = document.createElement('article'); card.className = 'entry';
+    const top = document.createElement('div'); top.className = 'entry-top';
+    const dt = document.createElement('span'); dt.className = 'entry-date'; dt.textContent = fmtDate(e.date);
+    const meta = document.createElement('span'); meta.className = 'entry-meta';
+    meta.textContent = `${fmtDur(e.secs)} · ${e.mode === 'vr' ? 'VR' : 'fullscreen'}${e.refresh ? ' ' + Math.round(e.refresh) + ' Hz' : ''} · ${e.reason}`;
+    top.append(dt, meta);
+    const sum = document.createElement('p'); sum.className = 'entry-sum'; sum.textContent = describe(e.cfg);
+    card.append(top, sum);
+    if (e.rating) { const r = document.createElement('span'); r.className = 'rating'; r.textContent = '★'.repeat(e.rating) + '☆'.repeat(5 - e.rating); card.append(r); }
+    if (e.note) { const n = document.createElement('p'); n.className = 'entry-note'; n.textContent = e.note; card.append(n); }
+    const acts = document.createElement('div'); acts.className = 'entry-actions';
+    const mk = (txt, fn, cls = '') => { const b = document.createElement('button'); b.className = 'chip ' + cls; b.textContent = txt; b.addEventListener('click', () => fn(b)); acts.append(b); return b; };
+    if (e.voice) playToggle(mk('▶ Voice note', () => {}), () => e.voice);
+    mk(e.note || e.rating ? 'Edit note' : 'Add note', () => openJournal(e));
+    mk('Use these settings', () => { loadCfg(e.cfg); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    mk('Delete', b => {
+      if (!b.classList.contains('confirm')) { b.classList.add('confirm', 'del'); b.textContent = 'Tap again to delete'; setTimeout(() => { b.classList.remove('confirm'); b.textContent = 'Delete'; }, 3000); return; }
+      dbDel('sessions', e.id).then(renderHistory);
+    });
+    card.append(acts); box.append(card);
+  });
+}
+
+// ================= Boot =================
+renderPresets();
+syncUI();
+setMode(mode);
+renderHistory();
+</script>
+<script>
+// =====================================================================
+// VR LOBBY: a calm 3D room with floating panels, all inside one WebXR session.
+// Raw WebGL (no libraries). Rooms are baked once into a sky texture; the lake,
+// stars, platform and orb are drawn live. The flicker reuses createSession() and
+// makeRenderer() from the main script, inside the same VR session.
+// =====================================================================
+const Lobby = (() => {
+  const ROOMS = [
+    { id: 'night', name: 'Starlit night', mode: 0 },
+    { id: 'dusk', name: 'Dusk lake', mode: 1 },
+    { id: 'space', name: 'Deep space', mode: 2 },
+    { id: 'void', name: 'Quiet void', mode: 3 }
+  ];
+  const SHORT = {
+    'Lab standard': 'The strongest setup from the lab studies.',
+    'First visions': 'Gentler and shorter. A good first session.',
+    'Deep imagery': 'A long session for complex scenes.',
+    'Find your frequency': 'Slowly scans 12 → 8 Hz to find your rate.',
+    'Drum-locked journey': 'A drum beats in time with the light.',
+    'Classic Ganzflicker': 'Red flicker from the online studies.'
+  };
+  let roomId = (() => { try { return localStorage.getItem('gf-room') || 'night'; } catch { return 'night'; } })();
+  const roomOf = id => ROOMS.find(r => r.id === id) || ROOMS[0];
+
+  // ---------------- small math ----------------
+  const mul = (a, b) => { const o = new Float32Array(16);
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; };
+  function inv(m) {
+    const o = new Float32Array(16), [a00,a01,a02,a03,a10,a11,a12,a13,a20,a21,a22,a23,a30,a31,a32,a33] = m;
+    const b00=a00*a11-a01*a10,b01=a00*a12-a02*a10,b02=a00*a13-a03*a10,b03=a01*a12-a02*a11,b04=a01*a13-a03*a11,b05=a02*a13-a03*a12,
+          b06=a20*a31-a21*a30,b07=a20*a32-a22*a30,b08=a20*a33-a23*a30,b09=a21*a32-a22*a31,b10=a21*a33-a23*a31,b11=a22*a33-a23*a32;
+    let d = b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06; if (!d) return o; d = 1 / d;
+    o[0]=(a11*b11-a12*b10+a13*b09)*d; o[1]=(a02*b10-a01*b11-a03*b09)*d; o[2]=(a31*b05-a32*b04+a33*b03)*d; o[3]=(a22*b04-a21*b05-a23*b03)*d;
+    o[4]=(a12*b08-a10*b11-a13*b07)*d; o[5]=(a00*b11-a02*b08+a03*b07)*d; o[6]=(a32*b02-a30*b05-a33*b01)*d; o[7]=(a20*b05-a22*b02+a23*b01)*d;
+    o[8]=(a10*b10-a11*b08+a13*b06)*d; o[9]=(a01*b08-a00*b10-a03*b06)*d; o[10]=(a30*b04-a31*b02+a33*b00)*d; o[11]=(a21*b02-a20*b04-a23*b00)*d;
+    o[12]=(a11*b07-a10*b09-a12*b06)*d; o[13]=(a00*b09-a01*b07+a02*b06)*d; o[14]=(a31*b01-a30*b03-a32*b00)*d; o[15]=(a20*b03-a21*b01+a22*b00)*d;
+    return o;
+  }
+  const rotOnly = v => { const o = new Float32Array(v); o[12] = o[13] = o[14] = 0; return o; };
+  const xf = (m, p) => [m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12], m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13], m[2]*p[0]+m[6]*p[1]+m[10]*p[2]+m[14]];
+  const xd = (m, p) => [m[0]*p[0]+m[4]*p[1]+m[8]*p[2], m[1]*p[0]+m[5]*p[1]+m[9]*p[2], m[2]*p[0]+m[6]*p[1]+m[10]*p[2]];
+  function trsY(x, y, z, yaw) { const c = Math.cos(yaw), s = Math.sin(yaw);
+    return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, x,y,z,1]); }
+  function perspective(fovy, aspect, near, far) { const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+    return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]); }
+  const dirFrom = (azDeg, elDeg) => { const a = azDeg * Math.PI / 180, e = elDeg * Math.PI / 180;
+    return [Math.cos(e) * Math.sin(a), Math.sin(e), -Math.cos(e) * Math.cos(a)]; };
+  const MOON = dirFrom(-18, 21), SUN = dirFrom(22, 2.2);
+
+  // ---------------- shaders ----------------
+  const NOISE = `
+float hash(vec3 p){ p=fract(p*0.3183099+vec3(0.1,0.2,0.3)); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+float noise(vec3 x){ vec3 i=floor(x); vec3 f=fract(x); f=f*f*(3.0-2.0*f);
+  return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z); }
+float fbm(vec3 p){ float a=0.5, s=0.0; for(int i=0;i<5;i++){ s+=a*noise(p); p*=2.03; a*=0.5; } return s; }
+float ridge(float az, float seed, float k){ return fbm(vec3(cos(az)*k, sin(az)*k, seed)); }
+float mountainH(vec3 d, int mode){
+  float az = atan(d.x, -d.z);
+  if (mode == 0) return 0.018 + 0.075*smoothstep(0.3,0.75, ridge(az,1.7,1.6)) + 0.012*ridge(az,5.1,6.0);
+  if (mode == 1) return 0.012 + 0.06*smoothstep(0.25,0.8, ridge(az,3.3,1.4)) + 0.01*ridge(az,8.2,7.0);
+  return -2.0;
+}`;
+  const PRE = `#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+`;
+  const VS_QUAD = `attribute vec2 p; varying vec2 vUv; varying vec2 vNdc; void main(){ vUv=p*0.5+0.5; vNdc=p; gl_Position=vec4(p,0.0,1.0); }`;
+
+  // Bake: one equirectangular sky texture per room.
+  const FS_BAKE = PRE + NOISE + `
+uniform int uMode; uniform vec3 uMoon; uniform vec3 uSun; varying vec2 vUv;
+vec3 dirFromUv(vec2 uv){ float lon=(uv.x-0.5)*6.2831853; float lat=(uv.y-0.5)*3.1415927; return vec3(cos(lat)*sin(lon), sin(lat), -cos(lat)*cos(lon)); }
+vec3 night(vec3 d){
+  float e = d.y;
+  vec3 c = mix(vec3(0.055,0.07,0.13), vec3(0.005,0.007,0.022), smoothstep(-0.02,0.55,e));
+  vec3 bn = normalize(vec3(0.42,0.55,0.72)); float k = dot(d,bn);
+  float band = exp(-k*k*14.0);
+  float dust = fbm(d*3.0+1.3); float lanes = smoothstep(0.45,0.7,fbm(d*7.0+4.0));
+  c += vec3(0.085,0.095,0.135)*band*(0.35+0.9*dust)*(1.0-0.6*lanes);
+  float md = dot(d,uMoon);
+  c += vec3(0.20,0.24,0.34)*pow(max(md,0.0),24.0)*0.16 + vec3(0.5,0.55,0.65)*pow(max(md,0.0),500.0)*0.3;
+  float r = acos(clamp(md,-1.0,1.0)); float R = 0.026;
+  if (r < R*1.1) {
+    float x = r/R; float limb = sqrt(max(0.0,1.0-x*x));
+    vec3 q = (d-uMoon)*110.0;
+    float maria = smoothstep(0.45,0.62,fbm(q*0.35+2.0)); float cr = fbm(q*1.4);
+    vec3 m = vec3(0.93,0.92,0.88)*(0.6+0.4*limb)*(0.92-0.24*maria+0.12*cr);
+    c = mix(c, m, smoothstep(1.0,0.96,x));
+  }
+  float h = mountainH(d,0);
+  vec3 mc = vec3(0.008,0.010,0.018) + vec3(0.018,0.022,0.035)*smoothstep(h-0.035,h,e);
+  c = mix(c, mc, smoothstep(h+0.0012,h-0.0012,e));
+  return c;
+}
+vec3 dusk(vec3 d){
+  float e = d.y;
+  vec3 hz=vec3(0.98,0.56,0.30), mid=vec3(0.58,0.31,0.50), zen=vec3(0.09,0.08,0.22);
+  vec3 c = mix(hz, mid, smoothstep(0.0,0.2,e)); c = mix(c, zen, smoothstep(0.16,0.8,e));
+  float sd = max(dot(d,uSun),0.0);
+  c += vec3(1.0,0.55,0.25)*pow(sd,10.0)*0.32 + vec3(1.0,0.8,0.55)*pow(sd,140.0)*0.5;
+  float r = acos(clamp(dot(d,uSun),-1.0,1.0)); c = mix(c, vec3(1.0,0.88,0.66), smoothstep(0.03,0.026,r));
+  float cl = smoothstep(0.55,0.82,fbm(vec3(d.x*3.0,d.y*16.0,d.z*3.0)+2.0))*smoothstep(0.03,0.09,e)*smoothstep(0.38,0.12,e);
+  c = mix(c, c*vec3(1.12,0.82,0.9)+vec3(0.08,0.02,0.04), cl*0.55);
+  float az = atan(d.x,-d.z);
+  float hf = 0.006 + 0.035*smoothstep(0.3,0.8,ridge(az,9.9,2.2));
+  c = mix(c, mix(hz,mid,0.55)*0.72, smoothstep(hf+0.0015,hf-0.0015,e)*0.85);
+  float hn = mountainH(d,1);
+  c = mix(c, vec3(0.15,0.085,0.17), smoothstep(hn+0.0012,hn-0.0012,e));
+  return c;
+}
+vec3 space(vec3 d){
+  vec3 c = vec3(0.006,0.005,0.014);
+  float n1=fbm(d*2.0+3.0), n2=fbm(d*5.0+9.0), n3=fbm(d*1.2+15.0);
+  float neb = smoothstep(0.45,0.85,n1)*(0.55+0.7*n2);
+  vec3 nc = mix(vec3(0.45,0.12,0.55), vec3(0.06,0.38,0.52), smoothstep(0.35,0.65,n3));
+  nc = mix(nc, vec3(0.75,0.3,0.35), smoothstep(0.7,0.9,n2)*0.5);
+  c += nc*neb*0.42;
+  vec3 g = normalize(vec3(-0.5,0.25,-0.8)); float gd = max(dot(d,g),0.0);
+  c += vec3(0.55,0.45,0.7)*pow(gd,80.0)*0.35 + vec3(0.9,0.8,1.0)*pow(gd,900.0)*0.6;
+  return c;
+}
+vec3 voidc(vec3 d){ float hz = exp(-d.y*d.y*40.0); return vec3(0.010,0.009,0.017) + vec3(0.014,0.009,0.024)*smoothstep(-0.3,0.6,d.y) + vec3(0.03,0.018,0.03)*hz; }
+void main(){
+  vec3 d = dirFromUv(vUv); vec3 c;
+  if (uMode==0) c = night(d); else if (uMode==1) c = dusk(d); else if (uMode==2) c = space(d); else c = voidc(d);
+  c += (hash(vec3(gl_FragCoord.xy,1.0))-0.5)/255.0;
+  gl_FragColor = vec4(c,1.0);
+}`;
+
+  // Sky pass: sample the baked sky; below the horizon on lake rooms, draw rippling water that reflects it.
+  const FS_SKY = PRE + `
+uniform sampler2D uSky; uniform mat4 uInvVP; uniform float uTime, uFade, uLake;
+uniform vec3 uLight, uLightCol, uDeep; varying vec2 vNdc;
+vec2 uvOf(vec3 d){ return vec2(atan(d.x,-d.z)/6.2831853+0.5, asin(clamp(d.y,-1.0,1.0))/3.1415927+0.5); }
+void main(){
+  vec4 w = uInvVP*vec4(vNdc,1.0,1.0); vec3 d = normalize(w.xyz/w.w);
+  vec3 c;
+  if (uLake > 0.5 && d.y < 0.0) {
+    float t = max(-d.y, 0.0008); vec2 p = d.xz/t*1.6; float dist = length(p);
+    float k1 = dot(p,vec2(0.8,0.6))*1.3 + uTime*0.7;
+    float k2 = dot(p,vec2(-0.55,0.83))*2.3 + uTime*1.05;
+    float k3 = dot(p,vec2(0.15,-0.99))*4.1 + uTime*1.5;
+    float k4 = dot(p,vec2(-0.9,-0.4))*7.3 + uTime*2.1;
+    float k5 = dot(p,vec2(0.97,-0.25))*12.1 + uTime*2.9;
+    float k6 = dot(p,vec2(-0.3,0.95))*17.3 + uTime*3.6;
+    vec2 g = vec2(0.8,0.6)*cos(k1)*0.030 + vec2(-0.55,0.83)*cos(k2)*0.026 + vec2(0.15,-0.99)*cos(k3)*0.020 + vec2(-0.9,-0.4)*cos(k4)*0.016
+           + vec2(0.97,-0.25)*cos(k5)*0.011 + vec2(-0.3,0.95)*cos(k6)*0.008;
+    g *= 1.0/(1.0+dist*0.06);
+    vec3 n = normalize(vec3(-g.x,1.0,-g.y));
+    vec3 r = reflect(d,n); r.y = max(abs(r.y),0.0008);
+    vec3 refl = texture2D(uSky, uvOf(r)).rgb;
+    float cosi = max(dot(-d,n),0.0); float fres = 0.02+0.98*pow(1.0-cosi,5.0);
+    c = mix(uDeep, refl, clamp(0.35+fres,0.0,1.0));
+    c += uLightCol*pow(max(dot(r,uLight),0.0),2400.0)*1.2;
+  } else {
+    c = texture2D(uSky, uvOf(d)).rgb;
+  }
+  gl_FragColor = vec4(c*uFade,1.0);
+}`;
+
+  const VS_STARS = PRE.replace('precision', 'precision') + NOISE + `
+attribute vec3 aPos; attribute vec3 aMisc; uniform mat4 uVProt; uniform float uTime, uFade, uMinE; uniform int uMode;
+varying float vA; varying vec3 vCol;
+void main(){
+  vec3 d = aPos;
+  float a = aMisc.x * (0.7 + 0.3*sin(uTime*aMisc.z + aMisc.y*6.28));
+  float h = mountainH(d, uMode);
+  a *= smoothstep(max(h,uMinE)+0.004, max(h,uMinE)+0.03, d.y);
+  if (uMode == 2) a = aMisc.x * (0.75 + 0.25*sin(uTime*aMisc.z + aMisc.y*6.28));
+  vA = a*uFade;
+  vCol = mix(vec3(0.75,0.82,1.0), vec3(1.0,0.86,0.7), fract(aMisc.y*7.31));
+  gl_Position = uVProt*vec4(d*50.0,1.0);
+  gl_PointSize = 1.5 + 3.2*aMisc.x;
+}`;
+  const FS_STARS = PRE + `varying float vA; varying vec3 vCol;
+void main(){ vec2 q = gl_PointCoord-0.5; float r = length(q); float s = smoothstep(0.5,0.0,r); gl_FragColor = vec4(vCol*vA*s, 0.0); }`;
+
+  const VS_WORLD = `attribute vec3 aPos; attribute vec2 aUv; uniform mat4 uMVP; varying vec2 vUv; void main(){ vUv=aUv; gl_Position=uMVP*vec4(aPos,1.0); }`;
+  const FS_PLATFORM = PRE + `uniform vec3 uCol, uRim; uniform float uFade; varying vec2 vUv;
+void main(){ float r = length(vUv-0.5)*2.0; float a = smoothstep(1.0,0.82,r)*0.92;
+  vec3 c = uCol*(0.85+0.15*(1.0-r)) + uRim*exp(-pow((r-0.8)*18.0,2.0))*0.6;
+  gl_FragColor = vec4(c*a*uFade, a*uFade); }`;
+  const FS_PANEL = PRE + `uniform sampler2D uTex; uniform float uOpacity; varying vec2 vUv;
+void main(){ gl_FragColor = texture2D(uTex, vec2(vUv.x, 1.0-vUv.y))*uOpacity; }`;
+  const VS_BILL = `attribute vec2 p; uniform mat4 uVP; uniform vec3 uCenter, uRight, uUp; uniform float uSize; varying vec2 vQ;
+void main(){ vQ = p; vec3 w = uCenter + (uRight*p.x + uUp*p.y)*uSize; gl_Position = uVP*vec4(w,1.0); }`;
+  const FS_GLOW = PRE + `uniform vec3 uColor; uniform float uIntensity, uCore; varying vec2 vQ;
+void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(uCore, uCore*0.6, r)*1.2; gl_FragColor = vec4(uColor*glow*uIntensity, 0.0); }`;
+  const VS_LINE = `attribute vec3 aPos; attribute float aA; uniform mat4 uVP; varying float vA; void main(){ vA=aA; gl_Position=uVP*vec4(aPos,1.0); }`;
+  const FS_LINE = PRE + `uniform vec3 uColor; varying float vA; void main(){ gl_FragColor = vec4(uColor*vA, vA); }`;
+
+  // ---------------- GL setup ----------------
+  let gl = null, G = null;
+  function compile(vs, fs, attrs) {
+    const sh = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) || 'shader error'); return s; };
+    const p = gl.createProgram();
+    gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+    (attrs || []).forEach((a, i) => gl.bindAttribLocation(p, i, a));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || 'link error');
+    const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) { const nm = gl.getActiveUniform(p, i).name.replace(/\[0\]$/, ''); u[nm] = gl.getUniformLocation(p, nm); }
+    return { p, u };
+  }
+  function buf(data) { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); return b; }
+
+  function init(glCtx) {
+    gl = glCtx;
+    G = {
+      quad: buf(new Float32Array([-1,-1, 1,-1, -1,1, 1,1])),
+      bake: compile(VS_QUAD, FS_BAKE, ['p']),
+      sky: compile(VS_QUAD, FS_SKY, ['p']),
+      stars: compile(VS_STARS, FS_STARS, ['aPos', 'aMisc']),
+      plat: compile(VS_WORLD, FS_PLATFORM, ['aPos', 'aUv']),
+      panel: compile(VS_WORLD, FS_PANEL, ['aPos', 'aUv']),
+      glow: compile(VS_BILL, FS_GLOW, ['p']),
+      line: compile(VS_LINE, FS_LINE, ['aPos', 'aA']),
+      lineBuf: gl.createBuffer(),
+      skyTex: gl.createTexture(), skyFor: null,
+      panelTex: gl.createTexture(), panelBuf: null, platBuf: null,
+      starBuf: {}, flicker: makeRenderer(gl)
+    };
+    const size = 1.5;
+    G.platBuf = buf(new Float32Array([-size,0,-size, 0,0,  size,0,-size, 1,0,  -size,0,size, 0,1,  size,0,size, 1,1]));
+  }
+  function attrib(loc, size, stride, off) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, stride, off); }
+  function noAttribs() { for (let i = 0; i < 4; i++) gl.disableVertexAttribArray(i); }
+
+  // Bake the chosen room's sky into a 4096x2048 texture (once per room).
+  function bake(room) {
+    if (G.skyFor === room.id) return;
+    const W = 4096, H = 2048;
+    gl.bindTexture(gl.TEXTURE_2D, G.skyTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, G.skyTex, 0);
+    gl.viewport(0, 0, W, H);
+    gl.disable(gl.BLEND); gl.disable(gl.DEPTH_TEST); gl.disable(gl.SCISSOR_TEST);
+    gl.useProgram(G.bake.p);
+    gl.uniform1i(G.bake.u.uMode, room.mode);
+    gl.uniform3fv(G.bake.u.uMoon, MOON); gl.uniform3fv(G.bake.u.uSun, SUN);
+    gl.bindBuffer(gl.ARRAY_BUFFER, G.quad); noAttribs(); attrib(0, 2, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(fb);
+    G.skyFor = room.id;
+  }
+  function starsFor(room) {
+    if (G.starBuf[room.id]) return G.starBuf[room.id];
+    const n = { night: 4200, dusk: 700, space: 7000, void: 0 }[room.id];
+    const minE = { night: 0, dusk: 0.3, space: -1, void: 2 }[room.id];
+    const data = new Float32Array(n * 6); let seed = 7 + room.mode * 101;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < n; i++) {
+      let y = rnd() * 2 - 1; const a = rnd() * Math.PI * 2;
+      if (minE > -1) y = minE + (1 - minE) * Math.pow(rnd(), 0.85);
+      const r = Math.sqrt(1 - y * y);
+      const mag = Math.pow(rnd(), room.id === 'dusk' ? 3.5 : 2.6) * (room.id === 'dusk' ? 0.5 : 1);
+      data.set([Math.cos(a) * r, y, Math.sin(a) * r, mag, rnd(), 0.6 + rnd() * 2.2], i * 6);
+    }
+    return (G.starBuf[room.id] = { b: buf(data), n, minE });
+  }
+
+  // ---------------- panel (canvas UI) ----------------
+  const PW = 2048, PH = 1280, PANEL_W = 1.6, PANEL_H = PANEL_W * PH / PW, PANEL_DIST = 1.75;
+  const cvs = document.createElement('canvas'); cvs.width = PW; cvs.height = PH;
+  const cx = cvs.getContext('2d');
+  const C = { bg: 'rgba(14,12,22,0.88)', line: 'rgba(255,255,255,0.10)', card: 'rgba(255,255,255,0.07)', cardHi: 'rgba(255,255,255,0.15)',
+              fg: '#f1edf7', muted: '#c6c0d3', accent: '#ff5a4e', warn: '#ffc06a' };
+  const F = { disp: '"Syne", "Avenir Next", sans-serif', body: '"IBM Plex Sans", system-ui, sans-serif', mono: '"IBM Plex Mono", ui-monospace, monospace' };
+  let buttons = [], hovered = new Set(), panelDirty = true;
+  function rr(x, y, w, h, r) { cx.beginPath(); cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r); cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath(); }
+  function text(t, x, y, font, color, align = 'left') { cx.font = font; cx.fillStyle = color; cx.textAlign = align; cx.textBaseline = 'alphabetic';
+    cx.shadowColor = 'rgba(0,0,0,0.55)'; cx.shadowBlur = 14; cx.fillText(t, x, y); cx.shadowColor = 'transparent'; cx.shadowBlur = 0; }
+  function wrap(t, x, y, maxW, lh, font, color, maxLines = 9) {
+    cx.font = font; const words = String(t).split(/\s+/); let line = '', n = 0;
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (cx.measureText(test).width > maxW && line) { text(line, x, y + n * lh, font, color); line = w; n++; if (n >= maxLines) return n; }
+      else line = test;
+    }
+    if (line) { text(line, x, y + n * lh, font, color); n++; }
+    return n;
+  }
+  function button(id, x, y, w, h, draw, onClick) { buttons.push({ id, x, y, w, h, onClick }); draw(hovered.has(id)); }
+  function pill(id, x, y, w, h, label, { primary = false, selected = false, disabled = false, size = 40 } = {}, onClick) {
+    button(id, x, y, w, h, hi => {
+      rr(x, y, w, h, h / 2);
+      cx.fillStyle = primary ? (disabled ? 'rgba(255,90,78,0.3)' : hi ? '#ff776d' : C.accent) : selected ? 'rgba(255,90,78,0.14)' : hi ? C.cardHi : C.card;
+      cx.fill();
+      cx.lineWidth = 3; cx.strokeStyle = selected || (hi && !primary) ? C.accent : primary ? 'transparent' : C.line; cx.stroke();
+      text(label, x + w / 2, y + h / 2 + size * 0.36, `${primary ? '700' : '500'} ${size}px ${primary ? F.disp : F.body}`,
+        primary ? '#140808' : selected ? C.accent : C.fg, 'center');
+    }, disabled ? null : onClick);
+  }
+
+  const L = { view: 'journeys', sel: null, rating: 0, entry: null, saved: false };
+  function journeys() {
+    const list = [{ name: 'Your setup', cfg: null, short: 'Your current settings from the flat screen.' }]
+      .concat(RESEARCH.map(r => ({ name: r.name, cfg: r.cfg, short: SHORT[r.name] || '', caution: r.caution })));
+    return list;
+  }
+  function metaOf(cfg) {
+    const c = { ...DEFAULTS, ...(cfg || state) };
+    const total = c.mins * 60 + (c.breathOn ? c.breathRounds * 4 * c.breathSec : 0);
+    return `${c.rhythm === 'glide' ? `${c.gStart}→${c.gEnd}` : c.hz} Hz · ~${Math.round(total / 60)} min`;
+  }
+  function drawPanel() {
+    buttons = [];
+    cx.clearRect(0, 0, PW, PH);
+    // Frosted glass: a see-through tint, darker toward the bottom where the buttons sit, with a light top edge.
+    rr(4, 4, PW - 8, PH - 8, 56);
+    const glass = cx.createLinearGradient(0, 0, 0, PH);
+    glass.addColorStop(0, 'rgba(24,22,38,0.46)'); glass.addColorStop(1, 'rgba(12,10,20,0.62)');
+    cx.fillStyle = glass; cx.fill();
+    const edge = cx.createLinearGradient(0, 0, 0, PH);
+    edge.addColorStop(0, 'rgba(255,255,255,0.32)'); edge.addColorStop(0.4, 'rgba(255,255,255,0.10)'); edge.addColorStop(1, 'rgba(255,255,255,0.06)');
+    cx.lineWidth = 4; cx.strokeStyle = edge; cx.stroke();
+    if (L.view === 'journeys') {
+      text('Choose a journey', 90, 150, `800 88px ${F.disp}`, C.fg);
+      text('Point and pull the trigger to choose · squeeze the grip to bring this panel in front of you', 92, 212, `400 36px ${F.body}`, C.muted);
+      const items = journeys(), cols = 3, gx = 30, cw = (PW - 180 - gx * (cols - 1)) / cols, ch = 214;
+      items.forEach((it, i) => {
+        const x = 90 + (i % cols) * (cw + gx), y = 262 + Math.floor(i / cols) * (ch + 26);
+        button('j' + i, x, y, cw, ch, hi => {
+          rr(x, y, cw, ch, 28); cx.fillStyle = hi ? C.cardHi : C.card; cx.fill();
+          cx.lineWidth = 3; cx.strokeStyle = hi ? C.accent : C.line; cx.stroke();
+          text(it.name, x + 34, y + 68, `500 46px ${F.body}`, C.fg);
+          text(metaOf(it.cfg), x + 34, y + 116, `400 32px ${F.mono}`, C.muted);
+          wrap(it.short, x + 34, y + 166, cw - 68, 40, `400 33px ${F.body}`, it.caution ? C.warn : C.muted, 1);
+        }, () => { L.sel = it; L.view = 'detail'; panelDirty = true; });
+      });
+      // room chooser + exit
+      const by = 1090;
+      text('ROOM', 92, by + 52, `400 30px ${F.mono}`, C.muted);
+      let x = 210;
+      ROOMS.forEach(r => {
+        cx.font = `500 38px ${F.body}`; const w = cx.measureText(r.name).width + 70;
+        pill('room-' + r.id, x, by, w, 80, r.name, { selected: r.id === roomId, size: 38 }, () => setRoom(r.id));
+        x += w + 18;
+      });
+      pill('amb', PW - 90 - 260 - 24 - 280, by, 280, 80, ambOn ? 'Sounds: on' : 'Sounds: off', { selected: ambOn, size: 38 }, () => {
+        ambOn = !ambOn; try { localStorage.setItem('gf-amb', ambOn ? 'on' : 'off'); } catch {} panelDirty = true;
+      });
+      pill('exit', PW - 90 - 260, by, 260, 80, 'Exit VR', { size: 38 }, () => exit());
+    } else if (L.view === 'detail') {
+      const it = L.sel, cfg = { ...DEFAULTS, ...(it.cfg || state) };
+      text('JOURNEY', 92, 120, `400 32px ${F.mono}`, C.accent);
+      text(it.name, 90, 220, `800 100px ${F.disp}`, C.fg);
+      text(`${metaOf(it.cfg)} · ${roomOf(roomId).name}`, 92, 290, `400 38px ${F.mono}`, C.muted);
+      const why = it.cfg ? (RESEARCH.find(r => r.name === it.name) || {}).why : 'Uses your current settings from the flat-screen app.';
+      const n = wrap(why || '', 92, 380, 1500, 60, `400 44px ${F.body}`, C.fg, 5);
+      wrap(describe(cfg), 92, 400 + n * 60 + 30, 1500, 46, `400 32px ${F.mono}`, C.muted, 3);
+      rr(90, 860, 1860, 120, 24); cx.fillStyle = 'rgba(255,179,71,0.08)'; cx.fill(); cx.strokeStyle = 'rgba(255,179,71,0.5)'; cx.lineWidth = 3; cx.stroke();
+      text('Get comfortable, then close your eyes when the light begins. Pull the trigger at any time to stop.', 130, 935, `400 36px ${F.body}`, C.warn);
+      pill('back', 90, 1060, 300, 120, 'Back', { size: 44 }, () => { L.view = 'journeys'; panelDirty = true; });
+      pill('begin', PW - 90 - 640, 1060, 640, 120, 'Begin', { primary: true, size: 54 }, () => begin());
+    } else if (L.view === 'rating') {
+      text('Welcome back', 90, 200, `800 100px ${F.disp}`, C.fg);
+      text('How strong were the visuals?', 92, 300, `400 48px ${F.body}`, C.muted);
+      const size = 190, gap = 60, x0 = (PW - (size * 5 + gap * 4)) / 2;
+      for (let r = 1; r <= 5; r++) {
+        const x = x0 + (r - 1) * (size + gap), y = 400;
+        button('r' + r, x, y, size, size, hi => {
+          cx.beginPath(); cx.arc(x + size / 2, y + size / 2, size / 2 - 4, 0, Math.PI * 2);
+          const on = r <= L.rating;
+          cx.fillStyle = on ? 'rgba(255,179,71,0.22)' : hi ? C.cardHi : C.card; cx.fill();
+          cx.lineWidth = 5; cx.strokeStyle = on ? C.warn : hi ? C.accent : C.line; cx.stroke();
+          text(String(r), x + size / 2, y + size / 2 + 30, `700 84px ${F.disp}`, on ? C.warn : C.fg, 'center');
+        }, () => { L.rating = r; panelDirty = true; });
+      }
+      text('barely anything', x0 + size / 2, 650, `400 32px ${F.body}`, C.muted, 'center');
+      text('vivid scenes', x0 + 4 * (size + gap) + size / 2, 650, `400 32px ${F.body}`, C.muted, 'center');
+      text(L.saved ? 'Saved to your journal.' : 'Add written notes later in the Journal on the flat screen.', 92, 800, `400 38px ${F.body}`, L.saved ? '#7ad7a0' : C.muted);
+      pill('skip', 90, 1060, 300, 120, L.saved ? 'Done' : 'Skip', { size: 44 }, () => { L.view = 'journeys'; L.saved = false; panelDirty = true; });
+      if (!L.saved) pill('save', PW - 90 - 640, 1060, 640, 120, 'Save rating', { primary: true, disabled: !L.rating, size: 54 }, () => saveRating());
+    }
+  }
+  function uploadPanel() {
+    drawPanel();
+    gl.bindTexture(gl.TEXTURE_2D, G.panelTex);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cvs);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    const isGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+    if (isGL2) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }
+    else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const ext = gl.getExtension('EXT_texture_filter_anisotropic');
+    if (ext) gl.texParameterf(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+    panelDirty = false;
+  }
+  let panelM = null, panelInv = null;
+  function placePanel(headM, eyeH) {
+    const fx = -headM[8], fz = -headM[10], yaw = Math.atan2(fx, -fz);
+    const hx = headM[12], hz = headM[14];
+    const y = Math.max(floorY + 0.9, (eyeH ?? headM[13]) - 0.12);
+    panelM = trsY(hx + Math.sin(yaw) * PANEL_DIST, y, hz - Math.cos(yaw) * PANEL_DIST, -yaw);
+    panelInv = inv(panelM);
+    const w = PANEL_W / 2, h = PANEL_H / 2;
+    G.panelBuf = G.panelBuf || gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, G.panelBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-w,-h,0, 0,0,  w,-h,0, 1,0,  -w,h,0, 0,1,  w,h,0, 1,1]), gl.STATIC_DRAW);
+  }
+  // Ray from a controller or hand onto the panel: returns canvas pixels or null.
+  function hitPanel(o, d) {
+    if (!panelInv) return null;
+    const lo = xf(panelInv, o), ld = xd(panelInv, d);
+    if (ld[2] >= -1e-4) return null;
+    const t = -lo[2] / ld[2]; if (t <= 0) return null;
+    const x = lo[0] + ld[0] * t, y = lo[1] + ld[1] * t;
+    if (Math.abs(x) > PANEL_W / 2 || Math.abs(y) > PANEL_H / 2) return null;
+    return { t, px: (x / PANEL_W + 0.5) * PW, py: (0.5 - y / PANEL_H) * PH, world: [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t] };
+  }
+  const buttonAt = (px, py) => buttons.find(b => b.onClick && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h);
+
+  // ---------------- drawing one eye ----------------
+  function drawRoom(P, V, vp, t, fade, opts = {}) {
+    const room = roomOf(roomId);
+    gl.viewport(vp.x, vp.y, vp.width, vp.height);
+    gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.SCISSOR_TEST); gl.disable(gl.BLEND);
+    const VProt = mul(P, rotOnly(V));
+    // sky + lake
+    gl.useProgram(G.sky.p);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, G.skyTex); gl.uniform1i(G.sky.u.uSky, 0);
+    gl.uniformMatrix4fv(G.sky.u.uInvVP, false, inv(VProt));
+    gl.uniform1f(G.sky.u.uTime, t); gl.uniform1f(G.sky.u.uFade, fade);
+    gl.uniform1f(G.sky.u.uLake, room.mode <= 1 ? 1 : 0);
+    gl.uniform3fv(G.sky.u.uLight, room.mode === 1 ? SUN : MOON);
+    gl.uniform3fv(G.sky.u.uLightCol, room.mode === 1 ? [1.0, 0.7, 0.4] : [0.85, 0.88, 0.95]);
+    gl.uniform3fv(G.sky.u.uDeep, room.mode === 1 ? [0.06, 0.035, 0.06] : [0.004, 0.006, 0.012]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, G.quad); noAttribs(); attrib(0, 2, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.enable(gl.BLEND);
+    // stars (additive)
+    const st = starsFor(room);
+    if (st.n) {
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.useProgram(G.stars.p);
+      gl.uniformMatrix4fv(G.stars.u.uVProt, false, VProt);
+      gl.uniform1f(G.stars.u.uTime, t); gl.uniform1f(G.stars.u.uFade, fade); gl.uniform1f(G.stars.u.uMinE, st.minE);
+      gl.uniform1i(G.stars.u.uMode, room.mode);
+      gl.bindBuffer(gl.ARRAY_BUFFER, st.b); noAttribs(); attrib(0, 3, 24, 0); attrib(1, 3, 24, 12);
+      gl.drawArrays(gl.POINTS, 0, st.n);
+    }
+    const VP = mul(P, V);
+    // platform under your feet (premultiplied alpha)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(G.plat.p);
+    gl.uniformMatrix4fv(G.plat.u.uMVP, false, mul(VP, trsY(0, (opts.floorY || 0) + 0.003, 0, 0)));
+    const pc = { 0: [0.035, 0.04, 0.06], 1: [0.12, 0.07, 0.1], 2: [0.05, 0.04, 0.09], 3: [0.03, 0.025, 0.045] }[room.mode];
+    const rim = { 0: [0.25, 0.3, 0.45], 1: [0.9, 0.5, 0.3], 2: [0.5, 0.35, 0.9], 3: [1.0, 0.75, 0.45] }[room.mode];
+    gl.uniform3fv(G.plat.u.uCol, pc); gl.uniform3fv(G.plat.u.uRim, rim); gl.uniform1f(G.plat.u.uFade, fade);
+    gl.bindBuffer(gl.ARRAY_BUFFER, G.platBuf); noAttribs(); attrib(0, 3, 20, 0); attrib(1, 2, 20, 12);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    // camera axes for billboards
+    const IV = inv(V), right = [IV[0], IV[1], IV[2]], up = [IV[4], IV[5], IV[6]];
+    gl.blendFunc(gl.ONE, gl.ONE);
+    // breathing orb in the void: one breath every 16 s (in 4, hold 4, out 4, hold 4)
+    if (room.mode === 3) {
+      const ph = (t % 16) / 4, i = Math.floor(ph), f = ph - i, e = f * f * (3 - 2 * f);
+      const b = [e, 1, 1 - e, 0][i];
+      glow(VP, right, up, [0, (opts.floorY || 0) + (opts.panel > 0.05 ? 3.25 : 1.6), -4.4], 0.75 + 0.18 * b, [1.0, 0.72, 0.45], (0.45 + 0.55 * b) * fade, 0.22);
+    }
+    // panel
+    if (opts.panel && panelM) {
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.useProgram(G.panel.p);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, G.panelTex); gl.uniform1i(G.panel.u.uTex, 0);
+      gl.uniformMatrix4fv(G.panel.u.uMVP, false, mul(VP, panelM));
+      gl.uniform1f(G.panel.u.uOpacity, opts.panel);
+      gl.bindBuffer(gl.ARRAY_BUFFER, G.panelBuf); noAttribs(); attrib(0, 3, 20, 0); attrib(1, 2, 20, 12);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    // pointer rays and cursors
+    (opts.rays || []).forEach(r => {
+      const len = r.hit ? r.hit.t : 1.2;
+      const end = [r.o[0] + r.d[0] * len, r.o[1] + r.d[1] * len, r.o[2] + r.d[2] * len];
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.useProgram(G.line.p);
+      gl.uniformMatrix4fv(G.line.u.uVP, false, VP); gl.uniform3fv(G.line.u.uColor, r.hit ? [1, 0.55, 0.5] : [0.9, 0.9, 1]);
+      gl.bindBuffer(gl.ARRAY_BUFFER, G.lineBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([...r.o, 0.0, ...end, r.hit ? 0.85 : 0.35]), gl.DYNAMIC_DRAW);
+      noAttribs(); attrib(0, 3, 16, 0); attrib(1, 1, 16, 12);
+      gl.drawArrays(gl.LINES, 0, 2);
+      if (r.hit) { gl.blendFunc(gl.ONE, gl.ONE); glow(VP, right, up, r.hit.world, 0.02, [1, 0.6, 0.55], 1.0, 0.25); }
+    });
+    noAttribs(); gl.disable(gl.BLEND);
+  }
+  function glow(VP, right, up, center, size, color, intensity, core) {
+    gl.useProgram(G.glow.p);
+    gl.uniformMatrix4fv(G.glow.u.uVP, false, VP);
+    gl.uniform3fv(G.glow.u.uCenter, center); gl.uniform3fv(G.glow.u.uRight, right); gl.uniform3fv(G.glow.u.uUp, up);
+    gl.uniform1f(G.glow.u.uSize, size); gl.uniform3fv(G.glow.u.uColor, color);
+    gl.uniform1f(G.glow.u.uIntensity, intensity); gl.uniform1f(G.glow.u.uCore, core);
+    gl.bindBuffer(gl.ARRAY_BUFFER, G.quad); noAttribs(); attrib(0, 2, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  // ---------------- the VR session ----------------
+
+  // ---------------- room ambience (synthesized, no files) ----------------
+  let ambOn = (() => { try { return localStorage.getItem('gf-amb') !== 'off'; } catch { return true; } })();
+  let amb = null;   // { out, stop, update }
+  // Stereo crickets: chirps of 3-4 quick pulses near 4.5 kHz, a few insects at different pitches, places and rhythms.
+  function cricketBuffer(ctx, n, level) {
+    return loopBuffer(ctx, 12, (d, sr, ch) => {
+      let seed = 11 + n * 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let k = 0; k < n; k++) {
+        const f = 4100 + rnd() * 1100, pan = rnd(), gainCh = ch ? pan : 1 - pan, period = 0.7 + rnd() * 0.6;
+        const amp = level * (0.4 + rnd() * 0.6) * (0.3 + 0.7 * gainCh);
+        for (let t0 = rnd() * period; t0 < d.length / sr; t0 += period * (0.92 + rnd() * 0.16)) {
+          const pulses = 3 + (rnd() < 0.5 ? 1 : 0);
+          for (let pI = 0; pI < pulses; pI++) {
+            const start = Math.floor((t0 + pI * 0.034) * sr), len = Math.floor(0.016 * sr);
+            for (let j = 0; j < len && start + j < d.length; j++) {
+              const env = Math.sin(Math.PI * j / len);
+              d[start + j] += Math.sin(2 * Math.PI * f * j / sr) * env * amp;
+            }
+          }
+        }
+      }
+    }, 2);
+  }
+  // Water lapping at a shore: brown-noise swells at irregular moments, plus a faint trickle.
+  function lapBuffer(ctx, strength) {
+    return loopBuffer(ctx, 20, (d, sr, ch) => {
+      const b = brownGen(), p = pinkGen(); let seed = 3 + ch * 17; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const env = new Float32Array(d.length);
+      for (let t0 = rnd(); t0 < d.length / sr; t0 += 1.6 + rnd() * 2.4) {
+        const s0 = Math.floor(t0 * sr), dur = Math.floor((0.7 + rnd() * 0.9) * sr), a = 0.5 + rnd() * 0.5;
+        for (let j = 0; j < dur && s0 + j < env.length; j++) { const x = j / dur; env[s0 + j] += a * Math.pow(Math.sin(Math.PI * x), 2) * (1 - 0.4 * x); }
+      }
+      for (let i = 0; i < d.length; i++) d[i] = (b() * (0.25 + env[i]) + p() * 0.08 * env[i]) * strength;
+    }, 2);
+  }
+
+  // Evening birds over a lake: a thrush-like flute phrase, robin-like phrases, small chirps and a distant loon.
+  // Each bird gets a place in stereo, a distance (quieter and duller when far) and a soft echo off the water.
+  function birdBuffer(ctx) {
+    return loopBuffer(ctx, 44, (d, sr, ch) => {
+      let seed = 97; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const dry = new Float32Array(d.length);
+      // one note: frequency glides f0 -> f1, optional vibrato, smooth attack/release, a little 2nd harmonic
+      function note(start, dur, f0, f1, amp, pan, vib = 0, vibHz = 0, curve = 1, harm = 0.12) {
+        const s0 = Math.floor(start * sr), n = Math.floor(dur * sr), g = ch ? pan : 1 - pan;
+        let ph = 0;
+        for (let j = 0; j < n && s0 + j < dry.length; j++) {
+          const x = j / n, f = f0 + (f1 - f0) * Math.pow(x, curve) + vib * Math.sin(2 * Math.PI * vibHz * j / sr);
+          ph += 2 * Math.PI * f / sr;
+          const env = Math.min(1, x / 0.08) * Math.min(1, (1 - x) / 0.25);
+          dry[s0 + j] += (Math.sin(ph) + harm * Math.sin(2 * ph)) * env * env * amp * (0.35 + 0.65 * g);
+        }
+      }
+      const T = d.length / sr;
+      // thrush: long clear note, then a quick fluty run, every ~9-13 s
+      for (let t = 1.5; t < T - 3; t += 9 + rnd() * 4) {
+        const base = 1700 + rnd() * 900, pan = 0.25 + rnd() * 0.2, amp = 0.055;
+        note(t, 0.42, base, base * 1.01, amp, pan, 6, 5);
+        let tt = t + 0.5; const up = rnd() < 0.5;
+        for (let k = 0; k < 7; k++) { const f = base * (up ? 1.25 + k * 0.07 : 1.8 - k * 0.07); note(tt, 0.07, f, f * 1.04, amp * 0.8, pan, 30, 22); tt += 0.075; }
+      }
+      // robin-like: 3-6 short warbled notes, a few phrases, then a pause
+      for (let t = 4 + rnd() * 2; t < T - 4; t += 6 + rnd() * 6) {
+        const pan = 0.65 + rnd() * 0.25, amp = 0.04, n = 3 + Math.floor(rnd() * 4);
+        let tt = t;
+        for (let k = 0; k < n; k++) { const f = 2200 + rnd() * 1100; note(tt, 0.16 + rnd() * 0.08, f, f * (rnd() < 0.5 ? 1.18 : 0.85), amp, pan, 40, 28, 0.7); tt += 0.26 + rnd() * 0.08; }
+      }
+      // small songbirds: quick soft downward chirps in little bursts
+      for (let t = 0.8; t < T - 1; t += 2.5 + rnd() * 4) {
+        const pan = rnd(), amp = 0.018 + rnd() * 0.012, n = 2 + Math.floor(rnd() * 4);
+        for (let k = 0; k < n; k++) note(t + k * 0.11, 0.05, 5200 + rnd() * 1500, 3600 + rnd() * 800, amp, pan, 0, 0, 0.6, 0.05);
+      }
+      // distant loon: a long rising wail, twice per cycle
+      [8.5, 30].forEach(t => {
+        const pan = 0.8, amp = 0.022;
+        note(t, 1.4, 640, 980, amp, pan, 8, 5, 0.5, 0.35);
+        note(t + 1.4, 1.8, 980, 960, amp, pan, 10, 5, 1, 0.35);
+        note(t + 3.2, 1.1, 980, 700, amp * 0.8, pan, 8, 5, 1.5, 0.35);
+      });
+      // echoes off the water: a few quieter, delayed copies (slightly different per ear)
+      for (let i = 0; i < d.length; i++) d[i] = dry[i];
+      [[0.14 + ch * 0.02, 0.32], [0.31 + ch * 0.03, 0.18], [0.55, 0.09]].forEach(([dl, g]) => {
+        const off = Math.floor(dl * sr); for (let i = off; i < d.length; i++) d[i] += dry[i - off] * g;
+      });
+    }, 2);
+  }
+  function buildAmbience(ctx, id) {
+    const out = ctx.createGain(); out.gain.value = 0;
+    const nodes = [], src = (buf, filters = []) => { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
+      let n = s; filters.forEach(f => { n.connect(f); n = f; }); n.connect(out); nodes.push(s); s.start(); return s; };
+    const filt = (type, f, q = 0.7) => { const x = ctx.createBiquadFilter(); x.type = type; x.frequency.value = f; x.Q.value = q; return x; };
+    const osc = (f, type, g, dest) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; const og = ctx.createGain(); og.gain.value = g; o.connect(og).connect(dest); o.start(); nodes.push(o); return o; };
+    const lfo = (f, depth, param) => { const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.value = depth; o.connect(g).connect(param); o.start(); nodes.push(o); };
+    let update = () => {};
+    if (id === 'night' || id === 'dusk') {
+      src(lapBuffer(ctx, id === 'night' ? 1.35 : 1.45), [filt('lowpass', 900), filt('highpass', 60)]);
+      src(cricketBuffer(ctx, id === 'night' ? 5 : 2, id === 'night' ? 0.06 : 0.025));
+      if (id === 'dusk') src(birdBuffer(ctx), [filt('highpass', 300), filt('lowpass', 7500)]);
+      // breeze: pink noise through a slowly wandering band-pass
+      const bp = filt('bandpass', id === 'night' ? 380 : 520, 0.6), wg = ctx.createGain(); wg.gain.value = id === 'night' ? 0.10 : 0.22; bp.connect(wg).connect(out);
+      const s = ctx.createBufferSource(); s.buffer = loopBuffer(ctx, 8, (d) => { const g = pinkGen(); for (let i = 0; i < d.length; i++) d[i] = g(); }, 2); s.loop = true; s.connect(bp); s.start(); nodes.push(s);
+      lfo(0.05, 160, bp.frequency); lfo(0.083, id === 'night' ? 0.05 : 0.1, wg.gain);
+    } else if (id === 'space') {
+      const lp = filt('lowpass', 520, 1.5), g = ctx.createGain(); g.gain.value = 0.12; lp.connect(g).connect(out);
+      [[41.2, 'sine', 0.9], [61.8, 'sine', 0.55], [82.6, 'triangle', 0.35], [123.6, 'sine', 0.18], [41.5, 'sawtooth', 0.08]].forEach(([f, t, a]) => osc(f, t, a, lp));
+      lfo(0.021, 260, lp.frequency);
+      const sh = ctx.createGain(); sh.gain.value = 0.012; sh.connect(out);
+      osc(1318.5, 'sine', 1, sh); osc(1975.5, 'sine', 0.6, sh); lfo(0.07, 0.01, sh.gain);
+    } else if (id === 'void') {
+      // warm tone that breathes with the orb: in 4, hold 4, out 4, hold 4
+      const lp = filt('lowpass', 700), g = ctx.createGain(); g.gain.value = 0; lp.connect(g).connect(out);
+      osc(130.81, 'sine', 0.8, lp); osc(196.0, 'sine', 0.5, lp); osc(261.63, 'triangle', 0.15, lp);
+      const hiss = ctx.createBufferSource(); hiss.buffer = loopBuffer(ctx, 6, (d) => { const p = pinkGen(); for (let i = 0; i < d.length; i++) d[i] = p() * 0.04; }, 2);
+      hiss.loop = true; hiss.connect(out); hiss.start(); nodes.push(hiss);
+      update = (t, at = ctx.currentTime) => { const ph = (t % 16) / 4, i = Math.floor(ph), f = ph - i, e = f * f * (3 - 2 * f); const b = [e, 1, 1 - e, 0][i]; ramp(g.gain, 0.04 + 0.15 * b, at, 0.15); };
+    }
+    return {
+      out, update,
+      stop() { try { out.gain.setTargetAtTime(0, ctx.currentTime, 0.4); } catch {}
+        setTimeout(() => { nodes.forEach(n => { try { n.stop(); } catch {} }); try { out.disconnect(); } catch {} }, 2000); }
+    };
+  }
+  function startAmbience() {
+    const ctx = sharedAudioCtx; if (!ctx) return;
+    if (amb) { amb.stop(); amb = null; }
+    try { amb = buildAmbience(ctx, roomId); amb.out.connect(ctx.destination); } catch { amb = null; }
+  }
+
+  let xr = null, refSpace = null, viewerSpace = null, floorY = 0, S = null;
+  let mode = 'menu', fade = 1, fadeTarget = 1, panelAlpha = 1, lastT = null, meter = null, placed = false;
+  const sources = new Map();   // inputSource -> { hoverId }
+
+  function setRoom(id) {
+    roomId = id; try { localStorage.setItem('gf-room', id); } catch {}
+    bake(roomOf(id)); panelDirty = true;
+    if (xr) startAmbience();
+  }
+  function begin() {
+    if (L.sel.cfg) Object.assign(state, DEFAULTS, L.sel.cfg);
+    changed();
+    mode = 'fadeout'; fadeTarget = 0;
+  }
+  async function finish(reason) {
+    if (!S) return;
+    const done = S; S = null;
+    done.stopAudio();
+    mode = 'fadein'; fade = 0; fadeTarget = 1; placed = false;   // re-center the panel where you are now looking
+    const entry = await logEntry(done, reason);
+    L.entry = entry; L.rating = 0; L.saved = false;
+    L.view = entry && entry.secs >= 20 ? 'rating' : 'journeys';
+    panelDirty = true;
+  }
+  async function saveRating() {
+    if (!L.entry || !L.rating) return;
+    L.entry.rating = L.rating; await dbPut('sessions', L.entry); renderHistory();
+    L.saved = true; panelDirty = true;
+  }
+  function exit() { try { xr?.end(); } catch {} }
+
+  function onSelect(e) {
+    if (mode === 'running') { finish('stopped'); return; }
+    if (mode !== 'menu' && mode !== 'fadein') return;
+    const s = sources.get(e.inputSource); const b = s && s.hit && buttonAt(s.hit.px, s.hit.py);
+    if (b) { pulse(e.inputSource, 0.6, 30); b.onClick(); panelDirty = true; }
+  }
+  function onSqueeze() { if (mode === 'running') finish('stopped'); else placed = false; }
+  function pulse(src, v, ms) { try { src?.gamepad?.hapticActuators?.[0]?.pulse?.(v, ms); } catch {} }
+
+  async function enter() {
+    if (running) return;
+    // Ask for VR first, inside the tap, so the headset counts it as a direct tap.
+    let req;
+    try { req = navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'hand-tracking'] }); }
+    catch (e) { req = Promise.reject(e); }
+    try { const AC = window.AudioContext || window.webkitAudioContext; sharedAudioCtx = AC ? new AC() : null; sharedAudioCtx?.resume?.(); } catch {}
+    try { xr = await req; }
+    catch (e) {
+      try { sharedAudioCtx?.close(); } catch {} sharedAudioCtx = null;
+      const embedded = window.top !== window.self;
+      $('#lobbyNote').textContent = 'The headset refused to start VR (' + e.message + '). ' + (embedded
+        ? 'This page is running inside another page (such as the claude.ai viewer), which isn\'t allowed to use VR. Open your own site address directly.'
+        : 'Fully close the Quest browser, reopen this page and try again.');
+      return;
+    }
+    running = true; xrSession = xr;
+    try {
+      const canvas = document.createElement('canvas');
+      const g = canvas.getContext('webgl2', { xrCompatible: true, antialias: true }) || canvas.getContext('webgl', { xrCompatible: true, antialias: true });
+      await g.makeXRCompatible?.();
+      xr.updateRenderState({ baseLayer: new XRWebGLLayer(xr, g, { antialias: true }) });
+      if (!G || gl !== g) { init(g); }
+      try { refSpace = await xr.requestReferenceSpace('local-floor'); floorY = 0; }
+      catch { refSpace = await xr.requestReferenceSpace('local'); floorY = -1.6; }
+      viewerSpace = await xr.requestReferenceSpace('viewer');
+      G.skyFor = null; bake(roomOf(roomId));
+      try { const rates = [...(xr.supportedFrameRates || [])]; if (rates.length) xr.updateTargetFrameRate(Math.max(...rates)).catch(() => {}); } catch {}
+    } catch (e) {
+      $('#lobbyNote').textContent = 'The VR lobby couldn\'t start: ' + e.message + '. Send this message to Claude.';
+      try { xr.end(); } catch {}
+      return;
+    }
+    mode = 'menu'; fade = 0; fadeTarget = 1; L.view = 'journeys'; placed = false; panelDirty = true; lastT = null;
+    startAmbience();
+    meter = makeRefreshMeter();
+    xr.addEventListener('select', onSelect);
+    xr.addEventListener('squeeze', onSqueeze);
+    xr.addEventListener('inputsourceschange', () => sources.clear());
+    xr.addEventListener('end', () => {
+      if (amb) { amb.stop(); amb = null; }
+      if (S) { const s = S; S = null; s.stopAudio(); logEntry(s, 'stopped'); }
+      xr = null; xrSession = null; running = false;
+      setTimeout(() => { try { sharedAudioCtx?.close(); } catch {} sharedAudioCtx = null; }, 600);
+      $('#lobbyNote').textContent = 'Left the VR lobby. Tap Enter VR to go back in.';
+    });
+    document.fonts?.ready?.then(() => { panelDirty = true; });
+    xr.requestAnimationFrame(frame);
+  }
+
+  function frame(now, xf_) {
+    if (!xr) return;
+    xr.requestAnimationFrame(frame);
+    const t = now / 1000, dt = lastT === null ? 0 : Math.min(0.1, t - lastT); lastT = t;
+    const pose = xf_.getViewerPose(refSpace); if (!pose) return;
+    const layer = xr.renderState.baseLayer;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+
+    // Fades: room out before a session, back in after.
+    const speed = mode === 'fadeout' ? 1 / 2.5 : 1 / 3;
+    fade += Math.sign(fadeTarget - fade) * Math.min(Math.abs(fadeTarget - fade), dt * speed);
+    if (mode === 'fadeout' && fade <= 0.001) { S = createSession('vr'); mode = 'running'; }
+    if (mode === 'fadein' && fade >= 0.999) mode = 'menu';
+    const showPanel = mode === 'menu' || mode === 'fadein';
+    if (amb && sharedAudioCtx) {
+      ramp(amb.out.gain, ambOn && mode !== 'running' ? 0.55 * fade : 0, sharedAudioCtx.currentTime, 0.3);
+      amb.update(t);
+    }
+    panelAlpha += ((showPanel ? 1 : 0) - panelAlpha) * Math.min(1, dt * 6);
+
+    if (mode === 'running' && S) {
+      const F = S.frame(now, xr.frameRate || meter(now));
+      if (S.done) { finish('finished'); return; }
+      const vpose = xf_.getViewerPose(viewerSpace);
+      const P0 = [0, 0, -2, 1];
+      (vpose ? vpose.views : pose.views).forEach((view, i) => {
+        const vp = layer.getViewport(view), pm = view.projectionMatrix;
+        gl.disable(gl.BLEND); gl.disable(gl.DEPTH_TEST); gl.disable(gl.SCISSOR_TEST); noAttribs();
+        const c = xf(view.transform.inverse.matrix, P0), cw = pm[3]*c[0]+pm[7]*c[1]+pm[11]*c[2]+pm[15];
+        const ccx = pm[0]*c[0]+pm[4]*c[1]+pm[8]*c[2]+pm[12], ccy = pm[1]*c[0]+pm[5]*c[1]+pm[9]*c[2]+pm[13];
+        const eye = view.eye === 'right' ? 1 : view.eye === 'left' ? 0 : i;
+        G.flicker.draw(F, eye, vp, vp.x + (ccx / cw * 0.5 + 0.5) * vp.width, vp.y + (ccy / cw * 0.5 + 0.5) * vp.height, pm[0] * vp.width / 2);
+      });
+      return;
+    }
+
+    if (!placed) { placePanel(pose.transform.matrix); placed = true; }
+    if (panelDirty) uploadPanel();
+
+    // Pointing: each controller or hand casts a ray onto the panel.
+    const rays = [];
+    if (showPanel) {
+      const hoverNow = new Set();
+      for (const src of xr.inputSources) {
+        if (!src.targetRaySpace) continue;
+        const p = xf_.getPose(src.targetRaySpace, refSpace); if (!p) continue;
+        const m = p.transform.matrix, o = [m[12], m[13], m[14]], d = [-m[8], -m[9], -m[10]];
+        const hit = hitPanel(o, d);
+        const b = hit && buttonAt(hit.px, hit.py);
+        const prev = sources.get(src);
+        if (b && (!prev || prev.hoverId !== b.id)) pulse(src, 0.25, 15);
+        sources.set(src, { hit, hoverId: b ? b.id : null });
+        if (b) hoverNow.add(b.id);
+        if (src.targetRayMode === 'tracked-pointer') rays.push({ o, d, hit });
+      }
+      if (hoverNow.size !== hovered.size || [...hoverNow].some(h => !hovered.has(h))) { hovered = hoverNow; uploadPanel(); }
+    }
+    pose.views.forEach(view => {
+      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, layer.getViewport(view), t, fade,
+        { panel: panelAlpha > 0.01 ? panelAlpha * Math.max(fade, 0.0) : 0, rays: showPanel ? rays : [], floorY });
+    });
+  }
+
+  // Desktop preview, used for testing on a flat screen: renders one still view of a room.
+  function preview(canvas, id, { yaw = 0, pitch = 0, view = 'journeys', panel = true, t = 3 } = {}) {
+    const g = canvas.getContext('webgl2', { antialias: true }) || canvas.getContext('webgl');
+    init(g); roomId = id; bake(roomOf(id));
+    L.view = view; if (view === 'detail') L.sel = journeys()[1];
+    const eye = [0, 1.6, 0];
+    const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    // camera: rotate yaw (around Y) then pitch (around X)
+    const camM = mul(trsY(eye[0], eye[1], eye[2], -yaw), new Float32Array([1,0,0,0, 0,cp,sp,0, 0,-sp,cp,0, 0,0,0,1]));
+    placePanel(trsY(0, 1.6, 0, 0), 1.6); uploadPanel();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    const P = perspective(80 * Math.PI / 180, canvas.width / canvas.height, 0.05, 200);
+    drawRoom(P, inv(camM), { x: 0, y: 0, width: canvas.width, height: canvas.height }, t, 1, { panel: panel ? 1 : 0, floorY: 0 });
+  }
+
+  return { enter, preview, ROOMS, buildAmbience };
+})();
+
+// Home screen button
+(() => {
+  const btn = $('#enterLobby');
+  const ok = !!navigator.xr;
+  btn.disabled = !ok;
+  if (!ok) $('#lobbyNote').textContent = 'This browser has no VR support. Open this page in the Meta Quest Browser.';
+  btn.addEventListener('click', () => Lobby.enter());
+})();
+</script>
+
