@@ -285,6 +285,10 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
           <button class="chip" data-v="478">4-7-8</button>
           <button class="chip" data-v="res">Resonance</button>
         </div>
+        <div class="row">
+          <label for="b_breathRounds">Guided breaths <output data-for="b_breathRounds"></output></label>
+          <input type="range" id="b_breathRounds" data-key="breathRounds" min="2" max="40" step="1">
+        </div>
       </div>
       <label class="toggle"><input type="checkbox" data-key="bgOn"> Background sound</label>
       <div class="sub" id="b_bgRows">
@@ -619,7 +623,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <p class="note">A glowing sun symbol (a circle with a dot in the middle) and a soft tone guide your breathing: the dot swells until the circle fills with light as you breathe in, holds while you hold, and shrinks back as you breathe out. A small chime marks each new breath. Then the flicker fades in while the guide fades away over two more breaths.</p>
         <div class="row">
           <label for="breathRounds">Guided breaths <output data-for="breathRounds"></output></label>
-          <input type="range" id="breathRounds" data-key="breathRounds" min="2" max="15" step="1">
+          <input type="range" id="breathRounds" data-key="breathRounds" min="2" max="40" step="1">
         </div>
         <div class="row" id="breathSecRow">
           <label for="breathSec">Count for each step <output data-for="breathSec"></output></label>
@@ -814,7 +818,11 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <label for="fMins">Time in the field <output id="fMinsOut"></output></label>
         <input type="range" id="fMins" data-fkey="mins" min="5" max="30" step="5">
       </div>
-      <label class="toggle"><input type="checkbox" data-fkey="prep"> Settle first with 3 minutes of slow breathing</label>
+      <div class="row">
+        <label for="fPrep">Slow breathing first <output id="fPrepOut"></output></label>
+        <input type="range" id="fPrep" data-fkey="prepMin" min="0" max="10" step="1">
+        <p class="note">Resonance breathing, in 5.5 seconds and out 5.5, guided by the sun symbol, before the field appears. Set it to off to go straight in.</p>
+      </div>
     </div>
     <p class="plan" id="fPlan"></p>
     <p class="note">Sit or lie down. An even field can feel strange or disorienting, so stop whenever you want: pull the trigger in VR, or tap the screen in fullscreen.</p>
@@ -2361,33 +2369,35 @@ const FIELD_COLORS = {
   azure: { name: 'Soft blue', hex: '#90aad0' }, violet: { name: 'Violet', hex: '#aa98cc' }
 };
 const FIELD_SOUNDS = { pink: 'pink noise', white: 'white noise', brown: 'brown noise', none: 'no added sound' };
-const FIELD_DEFAULTS = { color: 'rose', visual: 'flat', sound: 'pink', eyes: 'open', mins: 15, prep: true, bright: 35, vol: 30 };
+const FIELD_DEFAULTS = { color: 'rose', visual: 'flat', sound: 'pink', eyes: 'open', mins: 15, prepMin: 3, bright: 35, vol: 30 };
 const FIELD_PRESETS = [
   { name: 'Classic Ganzfeld', short: 'Rose light and soft pink noise, eyes open. The traditional lab setup.',
-    set: { visual: 'flat', color: 'rose', sound: 'pink', eyes: 'open', mins: 15, prep: true, bright: 35 } },
+    set: { visual: 'flat', color: 'rose', sound: 'pink', eyes: 'open', mins: 15, bright: 35 } },
   { name: 'Silent field', short: 'The same rose field with no added sound, to compare against the classic.',
-    set: { visual: 'flat', color: 'rose', sound: 'none', eyes: 'open', mins: 15, prep: true, bright: 35 } },
+    set: { visual: 'flat', color: 'rose', sound: 'none', eyes: 'open', mins: 15, bright: 35 } },
   { name: 'Neutral field', short: 'Plain gray light with pink noise. A baseline for comparing colors.',
-    set: { visual: 'flat', color: 'neutral', sound: 'pink', eyes: 'open', mins: 15, prep: true, bright: 35 } },
+    set: { visual: 'flat', color: 'neutral', sound: 'pink', eyes: 'open', mins: 15, bright: 35 } },
   { name: 'Eyes-closed glow', short: 'Brighter rose light seen through closed eyelids, with pink noise.',
-    set: { visual: 'flat', color: 'rose', sound: 'pink', eyes: 'closed', mins: 15, prep: true, bright: 75 } },
+    set: { visual: 'flat', color: 'rose', sound: 'pink', eyes: 'closed', mins: 15, bright: 75 } },
   { name: 'TV static', short: 'Gray snow like an old TV on a dead channel, with its hiss.',
-    set: { color: 'neutral', visual: 'static', sound: 'white', eyes: 'open', mins: 15, prep: true, bright: 50 } }
+    set: { color: 'neutral', visual: 'static', sound: 'white', eyes: 'open', mins: 15, bright: 50 } }
 ];
 const field = Object.assign({}, FIELD_DEFAULTS, store.get('gf-field') || {});
+if ('prep' in field) { if (!('prepMin' in (store.get('gf-field') || {}))) field.prepMin = field.prep ? 3 : 0; delete field.prep; }   // older saved setting
+const prepRounds = m => Math.round(m * 60 / 11);   // resonance breaths: 11 s each
 function fieldCfg(f = field) {
   const hex = (FIELD_COLORS[f.color] || FIELD_COLORS.rose).hex;
   return { ...DEFAULTS, ...BASE, kind: 'field', hz: 10, flash: hex, off: hex, bright: f.bright, mins: f.mins,
-           breathOn: !!f.prep, breathPattern: 'res', breathRounds: 16, breathSec: 4, breathVol: 35,
+           breathOn: f.prepMin > 0, breathPattern: 'res', breathRounds: Math.max(1, prepRounds(f.prepMin)), breathSec: 4, breathVol: 35,
            bgOn: f.sound !== 'none', bg: f.sound === 'none' ? 'pink' : f.sound, bgVol: f.vol, bgSwell: false,
            iso: false, bin: false, drumOn: false, hzShow: false, ending: 'wake',
-           fColor: f.color, fVisual: f.visual || 'flat', fSound: f.sound, fEyes: f.eyes, fPrep: !!f.prep, fVol: f.vol };
+           fColor: f.color, fVisual: f.visual || 'flat', fSound: f.sound, fEyes: f.eyes, fPrepMin: f.prepMin, fVol: f.vol };
 }
-const fieldFromCfg = c => ({ color: c.fColor || 'rose', visual: c.fVisual || 'flat', sound: c.fSound || 'pink', eyes: c.fEyes || 'open', mins: c.mins, prep: !!c.fPrep, bright: c.bright, vol: c.fVol || c.bgVol || 30 });
-const fieldMinutes = (f = field) => Math.round((f.prep ? 176 : 0) / 60 + f.mins + 0.1);
+const fieldFromCfg = c => ({ color: c.fColor || 'rose', visual: c.fVisual || 'flat', sound: c.fSound || 'pink', eyes: c.fEyes || 'open', mins: c.mins, prepMin: c.fPrepMin ?? (c.fPrep ? 3 : 0), bright: c.bright, vol: c.fVol || c.bgVol || 30 });
+const fieldMinutes = (f = field) => Math.round(prepRounds(f.prepMin) * 11 / 60 + f.mins + 0.1);
 function fieldDescribe(c) {
   const f = fieldFromCfg(c);
-  return `${(FIELD_COLORS[f.color] || FIELD_COLORS.rose).name} ${f.visual === 'static' ? 'static' : 'field'} · ${FIELD_SOUNDS[f.sound]} · eyes ${f.eyes} · ${f.mins} min` + (f.prep ? ' · breathing first' : '');
+  return `${(FIELD_COLORS[f.color] || FIELD_COLORS.rose).name} ${f.visual === 'static' ? 'static' : 'field'} · ${FIELD_SOUNDS[f.sound]} · eyes ${f.eyes} · ${f.mins} min` + (f.prepMin > 0 ? ` · ${f.prepMin} min breathing first` : '');
 }
 function renderFieldCards() {
   const box = $('#fieldCards'); box.innerHTML = '';
@@ -2412,12 +2422,12 @@ function syncField() {
     : 'One even color with no texture at all: the classic Ganzfeld.';
   $$('[data-fsound]').forEach(b => b.setAttribute('aria-pressed', b.dataset.fsound === field.sound));
   $$('[data-fkey]').forEach(el => { const k = el.dataset.fkey; if (el.type === 'checkbox') el.checked = !!field[k]; else el.value = field[k]; });
-  $('#fVolOut').textContent = field.vol + '%'; $('#fBrightOut').textContent = field.bright + '%'; $('#fMinsOut').textContent = field.mins + ' min';
+  $('#fVolOut').textContent = field.vol + '%'; $('#fBrightOut').textContent = field.bright + '%'; $('#fMinsOut').textContent = field.mins + ' min'; $('#fPrepOut').textContent = field.prepMin > 0 ? field.prepMin + ' min' : 'off';
   $('#fVolRow').hidden = field.sound === 'none';
   $('#fEyesNote').textContent = field.eyes === 'open'
     ? 'Eyes open is the classic version: let your gaze rest softly, blink normally, and don\'t try to focus on anything.'
     : 'Eyes closed: the light glows through your eyelids. It needs more brightness, and the color looks warmer.';
-  $('#fPlan').textContent = (field.prep ? '3 min slow breathing · ' : '') + `${field.mins} min in the ${FIELD_COLORS[field.color].name.toLowerCase()} ${field.visual === 'static' ? 'static' : 'field'} with ${FIELD_SOUNDS[field.sound]} · a slow fade and a chime to finish · about ${fieldMinutes()} min`;
+  $('#fPlan').textContent = (field.prepMin > 0 ? `${field.prepMin} min slow breathing · ` : '') + `${field.mins} min in the ${FIELD_COLORS[field.color].name.toLowerCase()} ${field.visual === 'static' ? 'static' : 'field'} with ${FIELD_SOUNDS[field.sound]} · a slow fade and a chime to finish · about ${fieldMinutes()} min`;
   $('#fVR').disabled = !navigator.xr;
   renderFieldCards();
 }
