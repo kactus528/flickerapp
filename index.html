@@ -788,7 +788,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
       <div class="row" id="fBlurRow">
         <label for="fBlur">Blur <output id="fBlurOut"></output></label>
         <input type="range" id="fBlur" data-fkey="blur" min="0" max="100" step="10">
-        <p class="note">Softens the static into cloudy, drifting noise and the focus dot into a soft glow. The more blur, the slower the static changes.</p>
+        <p class="note">Softens the static into cloudy, drifting noise. The more blur, the slower it changes.</p>
       </div>
       <div class="row">
         <span class="lbl">Color</span>
@@ -2437,7 +2437,7 @@ function fieldCfg(f = field) {
            bgOn: f.sound !== 'none', bg: f.sound === 'none' ? 'pink' : f.sound, bgVol: f.vol, bgSwell: false,
            iso: false, bin: false, drumOn: false, hzShow: false, ending: 'wake',
            dot: dotOn, dotColor: shadeHex(hex, f.visual === 'static' ? 0.12 : 0.45), dotSize: f.dotSize || 0.35, dotMode: 'steady',   // darker on static so it stands out from the grain
-           fColor: f.color, fVisual: f.visual || 'flat', fSound: f.sound, fEyes: f.eyes, fPrepMin: f.prepMin, fVol: f.vol, fDot: dotOn, fDotSize: f.dotSize || 0.35, fBlur: f.blur || 0 };
+           fColor: f.color, fVisual: f.visual || 'flat', fSound: f.sound, fEyes: f.eyes, fPrepMin: f.prepMin, fVol: f.vol, fDot: dotOn, fDotSize: f.dotSize || 0.35, fBlur: f.visual === 'static' ? (f.blur || 0) : 0 };
 }
 const fieldFromCfg = c => ({ color: c.fColor || 'rose', visual: c.fVisual || 'flat', sound: c.fSound || 'pink', eyes: c.fEyes || 'open', mins: c.mins, prepMin: c.fPrepMin ?? (c.fPrep ? 3 : 0), dot: !!c.fDot, dotSize: c.fDotSize || 0.35, blur: c.fBlur || 0, bright: c.bright, vol: c.fVol || c.bgVol || 30 });
 const fieldMinutes = (f = field) => Math.round(prepRounds(f.prepMin) * 11 / 60 + f.mins + 0.1);
@@ -2473,6 +2473,7 @@ function syncField() {
   $$('[data-fkey]').forEach(el => { const k = el.dataset.fkey; if (el.type === 'checkbox') el.checked = !!field[k]; else el.value = field[k]; });
   $('#fVolOut').textContent = field.vol + '%'; $('#fBrightOut').textContent = field.bright + '%'; $('#fMinsOut').textContent = field.mins + ' min'; $('#fPrepOut').textContent = field.prepMin > 0 ? field.prepMin + ' min' : 'off';
   $('#fBlurOut').textContent = field.blur ? field.blur + '%' : 'off';
+  $('#fBlurRow').hidden = field.visual !== 'static';   // blur only means something for static
   $('#fVolRow').hidden = field.sound === 'none';
   $('#fEyesNote').textContent = field.eyes === 'open'
     ? 'Eyes open is the classic version: let your gaze rest softly, blink normally, and don\'t try to focus on anything.'
