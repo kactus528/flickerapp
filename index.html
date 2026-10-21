@@ -770,9 +770,17 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
     <div class="screen-head">
       <p class="eyebrow">Field</p>
       <h2 id="h-field">Ganzfeld</h2>
-      <p class="note">An even field of color fills your whole view, the same wherever you look, with steady noise to mask outside sounds. Nothing flashes and nothing changes. Just rest your attention on it and notice what, if anything, appears. There's nothing to force, and seeing nothing is a normal result.</p>
+      <p class="note">An even field of color, or fine TV static, fills your whole view, the same wherever you look, with steady noise to mask outside sounds. Nothing flashes and nothing in it means anything. Just rest your attention on it and notice what, if anything, appears. There's nothing to force, and seeing nothing is a normal result.</p>
     </div>
     <div class="controls">
+      <div class="row">
+        <span class="lbl">Visual</span>
+        <div class="presets" id="fVisual" role="group" aria-label="Visual">
+          <button class="chip" data-fvisual="flat">Flat color</button>
+          <button class="chip" data-fvisual="static">TV static</button>
+        </div>
+        <p class="note" id="fVisualNote"></p>
+      </div>
       <div class="row">
         <span class="lbl">Color</span>
         <div class="presets" id="fColor" role="group" aria-label="Field color"></div>
@@ -1550,6 +1558,7 @@ function createSession(mode, override) {
   // flashing light are both clinical seizure triggers, so they are never combined).
   const J = cfg.kind === 'breath';
   const FIELD = cfg.kind === 'field';   // Ganzfeld: flash and dark are the same color, so nothing ever flashes
+  let frameNo = 0;                      // seeds the TV-static grain, one new pattern per frame
   const PROG = ['power', 'nadi', 'bellows'].includes(cfg.kind) ? buildProgram(cfg) : null;   // breath-only programs: no flicker
   let pi = 0;
   const JA = 180, JB = (cfg.hbMin || 20) * 60, JR = 420;
@@ -1853,6 +1862,7 @@ function createSession(mode, override) {
     return {
       t, hz, on, light,
       // Rate readout for eyes-open checks. Locked timing shows the exact rate on screen (refresh / frames per cycle).
+      stat: FIELD && cfg.fVisual === 'static' ? 1 : 0, seed: (frameNo = (frameNo + 1) % 997),
       rate: cfg.hzShow && t >= 0 && light > 0 ? { text: hz.toFixed(1) + ' Hz', a: clamp01(light * 2) } : null,
       eye(i) {
         const eOn = cfg.split === 'alt' && i === 1 ? !on : on;
@@ -1888,7 +1898,10 @@ uniform int uPat; uniform float uT;
 uniform vec3 uDotCol; uniform float uDotR; uniform float uDotA;
 uniform vec3 uSymCol; uniform float uBreath; uniform float uGuide; uniform float uProg; uniform float uSide;
 uniform sampler2D uTxt; uniform float uTxtA;
+uniform float uStat; uniform float uSeed;
 const float TAU = 6.2831853;
+// Hash without sine (Dave Hoskins), stable on mobile GPUs: 0..1 per cell.
+float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 void main(){
   vec2 q = (gl_FragCoord.xy - uC) / uPPR;
   float r = length(q); float a = atan(q.y, q.x);
@@ -1901,6 +1914,12 @@ void main(){
   }
   if (uPat > 0) m = smoothstep(0.3, 0.7, m);
   vec3 col = mix(uOff, uFlash, m * uOn);
+  if (uStat > 0.001) {
+    // TV static: grains about 0.15 degrees across, new random brightness every frame, same average brightness as the field.
+    vec2 cell = floor(q / max(0.0026, 2.0 / uPPR));   // about 3 headset pixels; at least 2 pixels on flat screens
+    float n = hash12(cell + vec2(uSeed * 17.0, uSeed * 59.0));
+    col *= mix(1.0, 2.0 * n, uStat);
+  }
   if (uDotA > 0.5) {
     float d = length(gl_FragCoord.xy - uC);
     col = mix(col, uDotCol, 1.0 - smoothstep(uDotR - 0.75, uDotR + 0.75, d));
@@ -1945,7 +1964,7 @@ function makeRenderer(gl) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
   const loc = n => gl.getUniformLocation(pr, n);
-  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide','uTxt','uTxtA'].map(n => [n, loc(n)]));
+  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide','uTxt','uTxtA','uStat','uSeed'].map(n => [n, loc(n)]));
   const aP = gl.getAttribLocation(pr, 'p');
   // Text texture for the rate readout: a dark pill with light text, so it reads on both the flash and the dark phase.
   let txTex = null, txText = '';
@@ -1980,6 +1999,7 @@ function makeRenderer(gl) {
       } else gl.uniform1f(U.uDotA, 0);
       if (F.sym) { gl.uniform3fv(U.uSymCol, F.sym.col); gl.uniform1f(U.uBreath, F.sym.b); gl.uniform1f(U.uGuide, F.sym.g); gl.uniform1f(U.uProg, F.sym.prog ?? 1); gl.uniform1f(U.uSide, F.sym.side || 0); }
       else gl.uniform1f(U.uGuide, 0);
+      gl.uniform1f(U.uStat, F.stat || 0); gl.uniform1f(U.uSeed, F.seed || 0);
       if (F.rate) {
         setText(F.rate.text);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, txTex); gl.activeTexture(gl.TEXTURE0);
@@ -2341,16 +2361,18 @@ const FIELD_COLORS = {
   azure: { name: 'Soft blue', hex: '#90aad0' }, violet: { name: 'Violet', hex: '#aa98cc' }
 };
 const FIELD_SOUNDS = { pink: 'pink noise', white: 'white noise', brown: 'brown noise', none: 'no added sound' };
-const FIELD_DEFAULTS = { color: 'rose', sound: 'pink', eyes: 'open', mins: 15, prep: true, bright: 35, vol: 30 };
+const FIELD_DEFAULTS = { color: 'rose', visual: 'flat', sound: 'pink', eyes: 'open', mins: 15, prep: true, bright: 35, vol: 30 };
 const FIELD_PRESETS = [
   { name: 'Classic Ganzfeld', short: 'Rose light and soft pink noise, eyes open. The traditional lab setup.',
-    set: { color: 'rose', sound: 'pink', eyes: 'open', mins: 15, prep: true, bright: 35 } },
+    set: { visual: 'flat', color: 'rose', sound: 'pink', eyes: 'open', mins: 15, prep: true, bright: 35 } },
   { name: 'Silent field', short: 'The same rose field with no added sound, to compare against the classic.',
-    set: { color: 'rose', sound: 'none', eyes: 'open', mins: 15, prep: true, bright: 35 } },
+    set: { visual: 'flat', color: 'rose', sound: 'none', eyes: 'open', mins: 15, prep: true, bright: 35 } },
   { name: 'Neutral field', short: 'Plain gray light with pink noise. A baseline for comparing colors.',
-    set: { color: 'neutral', sound: 'pink', eyes: 'open', mins: 15, prep: true, bright: 35 } },
+    set: { visual: 'flat', color: 'neutral', sound: 'pink', eyes: 'open', mins: 15, prep: true, bright: 35 } },
   { name: 'Eyes-closed glow', short: 'Brighter rose light seen through closed eyelids, with pink noise.',
-    set: { color: 'rose', sound: 'pink', eyes: 'closed', mins: 15, prep: true, bright: 75 } }
+    set: { visual: 'flat', color: 'rose', sound: 'pink', eyes: 'closed', mins: 15, prep: true, bright: 75 } },
+  { name: 'TV static', short: 'Gray snow like an old TV on a dead channel, with its hiss.',
+    set: { color: 'neutral', visual: 'static', sound: 'white', eyes: 'open', mins: 15, prep: true, bright: 50 } }
 ];
 const field = Object.assign({}, FIELD_DEFAULTS, store.get('gf-field') || {});
 function fieldCfg(f = field) {
@@ -2359,13 +2381,13 @@ function fieldCfg(f = field) {
            breathOn: !!f.prep, breathPattern: 'res', breathRounds: 16, breathSec: 4, breathVol: 35,
            bgOn: f.sound !== 'none', bg: f.sound === 'none' ? 'pink' : f.sound, bgVol: f.vol, bgSwell: false,
            iso: false, bin: false, drumOn: false, hzShow: false, ending: 'wake',
-           fColor: f.color, fSound: f.sound, fEyes: f.eyes, fPrep: !!f.prep, fVol: f.vol };
+           fColor: f.color, fVisual: f.visual || 'flat', fSound: f.sound, fEyes: f.eyes, fPrep: !!f.prep, fVol: f.vol };
 }
-const fieldFromCfg = c => ({ color: c.fColor || 'rose', sound: c.fSound || 'pink', eyes: c.fEyes || 'open', mins: c.mins, prep: !!c.fPrep, bright: c.bright, vol: c.fVol || c.bgVol || 30 });
+const fieldFromCfg = c => ({ color: c.fColor || 'rose', visual: c.fVisual || 'flat', sound: c.fSound || 'pink', eyes: c.fEyes || 'open', mins: c.mins, prep: !!c.fPrep, bright: c.bright, vol: c.fVol || c.bgVol || 30 });
 const fieldMinutes = (f = field) => Math.round((f.prep ? 176 : 0) / 60 + f.mins + 0.1);
 function fieldDescribe(c) {
   const f = fieldFromCfg(c);
-  return `${(FIELD_COLORS[f.color] || FIELD_COLORS.rose).name} field · ${FIELD_SOUNDS[f.sound]} · eyes ${f.eyes} · ${f.mins} min` + (f.prep ? ' · breathing first' : '');
+  return `${(FIELD_COLORS[f.color] || FIELD_COLORS.rose).name} ${f.visual === 'static' ? 'static' : 'field'} · ${FIELD_SOUNDS[f.sound]} · eyes ${f.eyes} · ${f.mins} min` + (f.prep ? ' · breathing first' : '');
 }
 function renderFieldCards() {
   const box = $('#fieldCards'); box.innerHTML = '';
@@ -2384,6 +2406,10 @@ function syncField() {
     `<button class="chip" data-fcolor="${k}"><span class="swatch-dot" style="background:${v.hex}"></span>${v.name}</button>`).join(''));
   $$('[data-fcolor]').forEach(b => b.setAttribute('aria-pressed', b.dataset.fcolor === field.color));
   $$('[data-feyes]').forEach(b => b.setAttribute('aria-pressed', b.dataset.feyes === field.eyes));
+  $$('[data-fvisual]').forEach(b => b.setAttribute('aria-pressed', b.dataset.fvisual === (field.visual || 'flat')));
+  $('#fVisualNote').textContent = field.visual === 'static'
+    ? 'Fine random snow that changes every frame, like a TV on a dead channel. Neutral color gives the classic gray look; the other colors tint it.'
+    : 'One even color with no texture at all: the classic Ganzfeld.';
   $$('[data-fsound]').forEach(b => b.setAttribute('aria-pressed', b.dataset.fsound === field.sound));
   $$('[data-fkey]').forEach(el => { const k = el.dataset.fkey; if (el.type === 'checkbox') el.checked = !!field[k]; else el.value = field[k]; });
   $('#fVolOut').textContent = field.vol + '%'; $('#fBrightOut').textContent = field.bright + '%'; $('#fMinsOut').textContent = field.mins + ' min';
@@ -2391,7 +2417,7 @@ function syncField() {
   $('#fEyesNote').textContent = field.eyes === 'open'
     ? 'Eyes open is the classic version: let your gaze rest softly, blink normally, and don\'t try to focus on anything.'
     : 'Eyes closed: the light glows through your eyelids. It needs more brightness, and the color looks warmer.';
-  $('#fPlan').textContent = (field.prep ? '3 min slow breathing · ' : '') + `${field.mins} min in the ${FIELD_COLORS[field.color].name.toLowerCase()} field with ${FIELD_SOUNDS[field.sound]} · a slow fade and a chime to finish · about ${fieldMinutes()} min`;
+  $('#fPlan').textContent = (field.prep ? '3 min slow breathing · ' : '') + `${field.mins} min in the ${FIELD_COLORS[field.color].name.toLowerCase()} ${field.visual === 'static' ? 'static' : 'field'} with ${FIELD_SOUNDS[field.sound]} · a slow fade and a chime to finish · about ${fieldMinutes()} min`;
   $('#fVR').disabled = !navigator.xr;
   renderFieldCards();
 }
@@ -2401,8 +2427,9 @@ document.addEventListener('input', e => {
   store.set('gf-field', field); syncField();
 });
 document.addEventListener('click', e => {
-  const c = e.target.closest('[data-fcolor]'), y = e.target.closest('[data-feyes]'), s = e.target.closest('[data-fsound]');
-  if (c) field.color = c.dataset.fcolor;
+  const c = e.target.closest('[data-fcolor]'), y = e.target.closest('[data-feyes]'), s = e.target.closest('[data-fsound]'), v = e.target.closest('[data-fvisual]');
+  if (v) field.visual = v.dataset.fvisual;
+  else if (c) field.color = c.dataset.fcolor;
   else if (y) { if (field.eyes !== y.dataset.feyes) field.bright = y.dataset.feyes === 'closed' ? Math.max(field.bright, 70) : Math.min(field.bright, 40); field.eyes = y.dataset.feyes; }
   else if (s) field.sound = s.dataset.fsound;
   else return;
@@ -2825,7 +2852,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       text(L.sel.name, 90, 220, `800 96px ${F.disp}`, C.fg);
       text(`~${fieldMinutes(f)} min · no flicker · ${roomOf(roomId).name}`, 92, 290, `400 38px ${F.mono}`, C.muted);
       rr(PW - 90 - 150, 160, 150, 150, 75); cx.fillStyle = col.hex; cx.fill(); cx.lineWidth = 3; cx.strokeStyle = C.line; cx.stroke();
-      const n = wrap('An even field of color fills your whole view, the same wherever you look' + (f.sound === 'none' ? ', with no added sound' : ', with steady noise to mask outside sounds') + '. Nothing flashes and nothing changes. Rest your attention on it and notice what, if anything, appears. Seeing nothing is a normal result.', 92, 370, 1840, 54, `400 40px ${F.body}`, C.fg, 5);
+      const n = wrap((f.visual === 'static' ? 'Fine, ever-changing snow fills your whole view, like an old TV on a dead channel' : 'An even field of color fills your whole view, the same wherever you look') + (f.sound === 'none' ? ', with no added sound' : ', with steady noise to mask outside sounds') + (f.visual === 'static' ? '. Nothing in it means anything.' : '. Nothing flashes and nothing changes.') + ' Rest your attention on it and notice what, if anything, appears. Seeing nothing is a normal result.', 92, 370, 1840, 54, `400 40px ${F.body}`, C.fg, 5);
       wrap(fieldDescribe(fieldCfg(f)), 92, 380 + n * 54 + 24, 1840, 44, `400 32px ${F.mono}`, C.muted, 2);
       rr(90, 830, 1860, 150, 24); cx.fillStyle = 'rgba(255,179,71,0.08)'; cx.fill(); cx.strokeStyle = 'rgba(255,179,71,0.5)'; cx.lineWidth = 3; cx.stroke();
       wrap((f.eyes === 'open' ? 'Keep your eyes open, let your gaze rest softly and blink normally.' : 'Close your eyes when the field appears; the light glows through your eyelids.')
