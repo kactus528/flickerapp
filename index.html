@@ -56,8 +56,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .vrhero .note { color: var(--fg); opacity: 0.8; }
 .seg { display: inline-grid; grid-template-columns: 1fr 1fr; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px; justify-self: start; }
 .seg button { font: inherit; font-size: 0.95rem; color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 8px 22px; cursor: pointer; }
-.seg.tabs { justify-self: stretch; grid-template-columns: 1fr 1fr 1fr; }
-.seg.tabs button { font-family: var(--display); font-weight: 700; font-size: 1.05rem; padding: 10px 12px; }
+.seg.tabs { justify-self: stretch; grid-template-columns: repeat(4, 1fr); }
+.seg.tabs button { font-family: var(--display); font-weight: 700; font-size: 1rem; padding: 10px 4px; }
 .swatch-dot { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 50%; margin-right: 0.45em; vertical-align: -0.05em; border: 1px solid rgba(255,255,255,0.25); }
 .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: 500; }
 .seg button:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
@@ -204,6 +204,11 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
       <button type="button" role="tab" data-hometab="flicker">Flicker</button>
       <button type="button" role="tab" data-hometab="breath">Breath</button>
       <button type="button" role="tab" data-hometab="field">Field</button>
+      <button type="button" role="tab" data-hometab="train">Train</button>
+    </div>
+    <div id="homeTrain" class="controls" style="padding-top:0" hidden>
+      <p class="note">Focused meditation exercises. No flashing: steady targets for training attention.</p>
+      <div class="rsets" id="trainCards"></div>
     </div>
     <div id="homeField" class="controls" style="padding-top:0" hidden>
       <p class="note">Ganzfeld: one soft, even color in every direction, with no flashing at all. With nothing to look at, some people start to see colors, textures, shapes or dreamlike scenes. Some don't, and that's fine too.</p>
@@ -844,6 +849,70 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
       <button class="go" id="fVR" type="button">Start in VR</button>
     </div>
   </section>
+  <section class="screen" data-screen="train" hidden aria-labelledby="h-train">
+    <div class="screen-head">
+      <p class="eyebrow">Train</p>
+      <h2 id="h-train">The Stillpoint</h2>
+      <p class="note">A single still point in the dark. Rest your attention on it. When your mind wanders, and it will, notice that it wandered and gently come back to the point. Each return is the exercise, not a failure. Inspired by focused-attention meditation and trataka, the yogic practice of steady gazing.</p>
+    </div>
+    <div class="controls">
+      <div class="row">
+        <span class="lbl">Target</span>
+        <div class="presets" id="trTarget" role="group" aria-label="Target">
+          <button class="chip" data-trtarget="white">White dot on black</button>
+          <button class="chip" data-trtarget="black">Black dot on white</button>
+          <button class="chip" data-trtarget="candle">Candle flame</button>
+        </div>
+        <p class="note" id="trTargetNote"></p>
+      </div>
+      <div class="row" id="trSizeRow">
+        <span class="lbl">Dot size</span>
+        <div class="presets" id="trSize" role="group" aria-label="Dot size">
+          <button class="chip" data-trsize="0.35">Small</button>
+          <button class="chip" data-trsize="0.7">Medium</button>
+          <button class="chip" data-trsize="1.2">Large</button>
+        </div>
+      </div>
+      <div class="row">
+        <label for="trBright">Brightness <output id="trBrightOut"></output></label>
+        <input type="range" id="trBright" data-trkey="bright" min="15" max="90" step="5">
+      </div>
+      <div class="row">
+        <label for="trGaze">Time on the point <output id="trGazeOut"></output></label>
+        <input type="range" id="trGaze" data-trkey="gaze" min="2" max="30" step="1">
+      </div>
+      <div class="row">
+        <span class="lbl">Return bell</span>
+        <div class="presets" id="trBell" role="group" aria-label="Return bell">
+          <button class="chip" data-trbell="0">Off</button>
+          <button class="chip" data-trbell="1">Every minute</button>
+          <button class="chip" data-trbell="3">Every 3 min</button>
+          <button class="chip" data-trbell="5">Every 5 min</button>
+        </div>
+        <p class="note">A soft bell that asks: where is your attention? If it drifted, come back to the point.</p>
+      </div>
+      <label class="toggle"><input type="checkbox" data-trkey="after"> End with the afterimage: at a chime the light goes out; close your eyes and hold the glowing afterimage for 90 seconds</label>
+      <div class="row">
+        <span class="lbl">Sound</span>
+        <div class="presets" id="trSound" role="group" aria-label="Sound">
+          <button class="chip" data-trsound="none">Silence</button>
+          <button class="chip" data-trsound="brown">Brown noise</button>
+          <button class="chip" data-trsound="pink">Pink noise</button>
+          <button class="chip" data-trsound="rain">Rain</button>
+        </div>
+      </div>
+      <div class="row">
+        <label for="trPrep">Slow breathing first <output id="trPrepOut"></output></label>
+        <input type="range" id="trPrep" data-trkey="prepMin" min="0" max="10" step="1">
+      </div>
+    </div>
+    <p class="plan" id="trPlan"></p>
+    <p class="note">Sit upright and comfortable. Blink when you need to; there's no need to strain. Pull the trigger in VR, or tap the screen in fullscreen, to stop.</p>
+    <div class="foot">
+      <button class="go secondary" id="trFS" type="button">Fullscreen</button>
+      <button class="go" id="trVR" type="button">Start in VR</button>
+    </div>
+  </section>
   <section class="screen" data-screen="journal" hidden aria-labelledby="h-journal">
     <div class="screen-head">
       <h2 id="h-journal">Session journal</h2>
@@ -1006,6 +1075,7 @@ const parseV = v => (v !== '' && !isNaN(v)) ? Number(v) : v;
 
 function describe(c, withBreath = true) {
   if (c.kind === 'field') return fieldDescribe(c);
+  if (c.kind === 'train') return trainDescribe(c);
   if (c.kind === 'power') return `Power breathing · ${c.pwRounds} rounds × ${c.pwBreaths} breaths · ${c.pwHolds} holds`;
   if (c.kind === 'nadi') return `Alternate nostril · ${c.ndMin} min · count ${c.ndCount}`;
   if (c.kind === 'bellows') return `Bellows breath · ${c.bxRounds} rounds × ${c.bxBreaths} breaths`;
@@ -1236,6 +1306,7 @@ $('#agree').addEventListener('click', () => { if (consent.checked) { backStack.l
 // ================= Presets =================
 function loadCfg(cfg, label) {
   if (cfg.kind === 'field') { Object.assign(field, fieldFromCfg(cfg)); store.set('gf-field', field); syncField(); go('field'); return; }
+  if (cfg.kind === 'train') { Object.assign(train, trainFromCfg(cfg)); store.set('gf-train', train); syncTrain(); go('train'); return; }
   if (STYLE_OF[cfg.kind]) {
     Object.keys(JOURNEY_DEFAULTS).forEach(k => { if (k in cfg) journey[k] = cfg[k]; });
     journey.bstyle = STYLE_OF[cfg.kind];
@@ -1580,6 +1651,10 @@ function createSession(mode, override) {
   const J = cfg.kind === 'breath';
   const FIELD = cfg.kind === 'field';   // Ganzfeld: flash and dark are the same color, so nothing ever flashes
   let frameNo = 0;                      // seeds the TV-static grain, one new pattern per frame
+  // Train exercises (The Stillpoint): a steady target, optional afterimage ending with eyes closed, optional return bell.
+  const TRAIN = cfg.kind === 'train';
+  const TG = TRAIN ? cfg.trGaze * 60 : 0, TAFTER = TRAIN && cfg.trAfter;
+  let nextBell = TRAIN && cfg.trBell ? cfg.trBell * 60 : Infinity, afterChimed = false;
   const PROG = ['power', 'nadi', 'bellows'].includes(cfg.kind) ? buildProgram(cfg) : null;   // breath-only programs: no flicker
   let pi = 0;
   const JA = 180, JB = (cfg.hbMin || 20) * 60, JR = 420;
@@ -1755,8 +1830,8 @@ function createSession(mode, override) {
       on = phase < 0.5;
     }
     // After a breath intro the flicker fades in slowly from nothing; otherwise it starts dim and reaches full in 4 s.
-    const fadeIn = B ? ease(clamp01(t / EASE)) : FIELD ? ease(clamp01(t / 10)) : Math.min(1, 0.25 + 0.75 * t / 4);
-    const endLight = cfg.ending === 'wake' ? (total - t) / W : cfg.ending === 'sleep' ? (total - t) / 20 : (total - t) / 4;
+    const fadeIn = B ? ease(clamp01(t / EASE)) : FIELD ? ease(clamp01(t / 10)) : TRAIN ? ease(clamp01(t / 8)) : Math.min(1, 0.25 + 0.75 * t / 4);
+    const endLight = TAFTER ? (TG - t) / 1.5 : TRAIN ? (TG - t) / 20 : cfg.ending === 'wake' ? (total - t) / W : cfg.ending === 'sleep' ? (total - t) / 20 : (total - t) / 4;
     const light = t < 0 || t >= total ? 0 : clamp01(fadeIn) * clamp01(endLight);
     // Breath guide level: full during the intro, fading out over the crossfade.
     let guide = B ? (t < 0 ? 1 : 1 - ease(clamp01(t / EASE))) : 0;
@@ -1869,6 +1944,11 @@ function createSession(mode, override) {
         A.prevOn = on;
       }
       if (cfg.ending === 'wake' && !chimed && t >= total) { chimed = true; chime(A.ctx, A.master, at + 0.05, 528); chime(A.ctx, A.master, at + 2.2, 396); }
+      if (TRAIN) {
+        if (!A.bellG) { A.bellG = A.ctx.createGain(); A.bellG.gain.value = 0.35; A.bellG.connect(A.master); }
+        if (t >= nextBell && t < TG - 20) { chime(A.ctx, A.bellG, at + 0.05, 396); nextBell += cfg.trBell * 60; }   // soft cue: return to the point
+        if (TAFTER && !afterChimed && t >= TG) { afterChimed = true; chime(A.ctx, A.master, at + 0.05, 440); }       // close your eyes: the afterimage
+      }
     }
 
     // ---- colors for this frame ----
@@ -1878,12 +1958,13 @@ function createSession(mode, override) {
     const symK = Math.max(cfg.bright / 100, 0.55);
     const sym = guide > 0.001 ? { col: flashAt(0).map(v => v * symK), b: bshape, g: guide, prog, side } : null;
     const fl = flashAt(Math.max(0, t)).map(v => v * k), of = offRGB.map(v => v * k);
-    const dotShown = cfg.dot && light > 0 && (cfg.dotMode === 'steady' || (cfg.dotMode === 'with') === on);
+    const dotShown = cfg.dot && light > 0.002 && (cfg.dotMode === 'steady' || (cfg.dotMode === 'with') === on);
     const dk = Math.max(cfg.bright / 100, 0.3) * Math.max(light, 0.3);
     return {
       t, hz, on, light,
       // Rate readout for eyes-open checks. Locked timing shows the exact rate on screen (refresh / frames per cycle).
       // Static seed: a new pattern every frame when sharp; with blur, patterns crossfade more slowly (24 a second down to 3).
+      candle: TRAIN && cfg.trTarget === 'candle' ? light : 0,
       stat: FIELD && cfg.fVisual === 'static' ? 1 : 0, blur: FIELD ? (cfg.fBlur || 0) / 100 : 0,
       seed: FIELD && cfg.fBlur > 0 ? (Math.max(0, t) * (24 - 21 * cfg.fBlur / 100)) % 997 : (frameNo = (frameNo + 1) % 997),
       rate: cfg.hzShow && t >= 0 && light > 0 ? { text: hz.toFixed(1) + ' Hz', a: clamp01(light * 2) } : null,
@@ -1921,7 +2002,7 @@ uniform int uPat; uniform float uT;
 uniform vec3 uDotCol; uniform float uDotR; uniform float uDotA;
 uniform vec3 uSymCol; uniform float uBreath; uniform float uGuide; uniform float uProg; uniform float uSide;
 uniform sampler2D uTxt; uniform float uTxtA;
-uniform float uStat; uniform float uSeed; uniform float uBlur;
+uniform float uStat; uniform float uSeed; uniform float uBlur; uniform float uCandle;
 const float TAU = 6.2831853;
 // Hash without sine (Dave Hoskins), stable on mobile GPUs: 0..1 per cell.
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -1962,6 +2043,29 @@ void main(){
       n = clamp(0.5 + dev * mix(1.0, 0.6, uBlur), 0.0, 1.0);   // softer contrast as blur rises, like a real blur
     }
     col *= mix(1.0, 2.0 * n, uStat);
+  }
+  if (uCandle > 0.001) {
+    // A still candle flame (no flicker) centered in view: teardrop flame, white-gold core, blue base, warm glow, dim lit candle below.
+    vec2 c = q - vec2(0.0, 0.002);
+    float u = c.y / 0.018;                                        // -1 at the flame's base, +1 at its tip
+    float pinch = 1.0 - 0.62 * max(u, 0.0);                       // narrower toward the tip
+    float fd = length(vec2(c.x / (0.0065 * max(pinch, 0.05)), u));
+    float flame = 1.0 - smoothstep(0.82, 1.0, fd);
+    float core = 1.0 - smoothstep(0.35, 0.75, length(vec2(c.x / 0.0034, (c.y + 0.004) / 0.0105)));
+    float blue = (1.0 - smoothstep(0.5, 1.0, length(vec2(c.x / 0.004, (c.y + 0.0155) / 0.004)))) * 0.6;
+    vec3 fcol = mix(vec3(1.0, 0.5, 0.12), vec3(1.0, 0.93, 0.72), core);
+    fcol = mix(fcol, vec3(0.25, 0.35, 1.0), blue * (1.0 - core));
+    float rr = length(c * vec2(1.0, 0.75));
+    vec3 glow = vec3(1.0, 0.55, 0.2) * (exp(-rr * rr / 0.0012) * 0.28 + exp(-rr / 0.09) * 0.05);
+    // candle body: top just under the flame, lit most near the top
+    float top = -0.0185, bx = abs(q.x);
+    float body = (1.0 - smoothstep(0.0115, 0.0125, bx)) * step(q.y, top) * step(top - 0.12, q.y);   // 0.12 rad tall
+    vec3 bcol = vec3(0.92, 0.82, 0.66) * (0.03 + 0.22 * exp((q.y - top) / 0.025)) * (1.0 - 0.35 * bx / 0.012);
+    float wick = (1.0 - smoothstep(0.0005, 0.0009, abs(q.x))) * step(top, q.y) * step(q.y, -0.0135);
+    vec3 cand = glow + bcol * body;
+    cand = mix(cand, fcol, flame);
+    cand = mix(cand, vec3(0.06, 0.04, 0.03), wick * (1.0 - core));
+    col += cand * uCandle;
   }
   if (uDotA > 0.5) {
     float d = length(gl_FragCoord.xy - uC);
@@ -2010,7 +2114,7 @@ function makeRenderer(gl) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
   const loc = n => gl.getUniformLocation(pr, n);
-  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide','uTxt','uTxtA','uStat','uSeed','uBlur'].map(n => [n, loc(n)]));
+  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide','uTxt','uTxtA','uStat','uSeed','uBlur','uCandle'].map(n => [n, loc(n)]));
   const aP = gl.getAttribLocation(pr, 'p');
   // Text texture for the rate readout: a dark pill with light text, so it reads on both the flash and the dark phase.
   let txTex = null, txText = '';
@@ -2045,7 +2149,7 @@ function makeRenderer(gl) {
       } else gl.uniform1f(U.uDotA, 0);
       if (F.sym) { gl.uniform3fv(U.uSymCol, F.sym.col); gl.uniform1f(U.uBreath, F.sym.b); gl.uniform1f(U.uGuide, F.sym.g); gl.uniform1f(U.uProg, F.sym.prog ?? 1); gl.uniform1f(U.uSide, F.sym.side || 0); }
       else gl.uniform1f(U.uGuide, 0);
-      gl.uniform1f(U.uStat, F.stat || 0); gl.uniform1f(U.uSeed, F.seed || 0); gl.uniform1f(U.uBlur, F.blur || 0);
+      gl.uniform1f(U.uStat, F.stat || 0); gl.uniform1f(U.uSeed, F.seed || 0); gl.uniform1f(U.uBlur, F.blur || 0); gl.uniform1f(U.uCandle, F.candle || 0);
       if (F.rate) {
         setText(F.rate.text);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, txTex); gl.activeTexture(gl.TEXTURE0);
@@ -2501,16 +2605,84 @@ document.addEventListener('click', e => {
 $('#fFS').addEventListener('click', () => startFS(fieldCfg()));
 $('#fVR').addEventListener('click', () => startVR(fieldCfg()));
 
-// Home: Flicker, Breath and Field tabs
+// ================= Train: focused meditation exercises =================
+const EXERCISES = {
+  stillpoint: { name: 'The Stillpoint', short: 'One still point of light in darkness. Keep your attention on it and gently return when you drift.',
+    about: 'Rest your attention on the single still point. When your mind wanders, notice it and gently come back. Each return is the exercise. Inspired by focused-attention meditation and trataka, the yogic practice of steady gazing.' }
+};
+const TRAIN_TARGETS = { white: 'White dot on black', black: 'Black dot on white', candle: 'Candle flame' };
+const TRAIN_DEFAULTS = { ex: 'stillpoint', target: 'white', size: 0.7, bright: 60, gaze: 10, bell: 0, after: false, sound: 'none', vol: 25, prepMin: 0 };
+const train = Object.assign({}, TRAIN_DEFAULTS, store.get('gf-train') || {});
+function trainCfg(tr = train) {
+  const bg = tr.target === 'black' ? '#ffffff' : '#000000';
+  const mins = tr.gaze + (tr.after ? 1.5 : 0);
+  return { ...DEFAULTS, ...BASE, kind: 'train', hz: 10, flash: bg, off: bg, mins,
+           bright: tr.target === 'black' ? Math.min(tr.bright, 70) : tr.bright,
+           dot: tr.target !== 'candle', dotColor: tr.target === 'black' ? '#000000' : '#ffffff', dotSize: tr.size, dotMode: 'steady',
+           breathOn: tr.prepMin > 0, breathPattern: 'res', breathRounds: Math.max(1, prepRounds(tr.prepMin)), breathSec: 4, breathVol: 35,
+           bgOn: tr.sound !== 'none', bg: tr.sound === 'none' ? 'brown' : tr.sound, bgVol: tr.vol, bgSwell: false,
+           iso: false, bin: false, drumOn: false, hzShow: false, ending: 'wake',
+           trEx: tr.ex, trTarget: tr.target, trSize: tr.size, trGaze: tr.gaze, trBell: tr.bell, trAfter: !!tr.after, trSound: tr.sound, trPrepMin: tr.prepMin, trBright: tr.bright };
+}
+const trainFromCfg = c => ({ ex: c.trEx || 'stillpoint', target: c.trTarget || 'white', size: c.trSize || 0.7, bright: c.trBright || c.bright, gaze: c.trGaze || 10,
+  bell: c.trBell || 0, after: !!c.trAfter, sound: c.trSound || 'none', vol: c.bgVol || 25, prepMin: c.trPrepMin || 0 });
+const trainMinutes = (tr = train) => Math.round(prepRounds(tr.prepMin) * 11 / 60 + tr.gaze + (tr.after ? 1.5 : 0) + 0.1);
+function trainDescribe(c) {
+  const tr = trainFromCfg(c);
+  return `${EXERCISES[tr.ex].name} · ${TRAIN_TARGETS[tr.target].toLowerCase()} · ${tr.gaze} min` + (tr.bell ? ` · bell every ${tr.bell} min` : '') + (tr.after ? ' · afterimage' : '');
+}
+function renderTrainCards() {
+  const box = $('#trainCards'); box.innerHTML = '';
+  Object.entries(EXERCISES).forEach(([k, v]) => {
+    const b = document.createElement('button'); b.className = 'rset'; b.type = 'button';
+    const t = document.createElement('b'); t.textContent = v.name;
+    const m = document.createElement('span'); m.textContent = `~${trainMinutes({ ...train, ex: k })} min`; t.append(m);
+    const w = document.createElement('small'); w.textContent = v.short;
+    b.append(t, w);
+    b.addEventListener('click', () => { train.ex = k; store.set('gf-train', train); syncTrain(); go('train'); });
+    box.append(b);
+  });
+}
+function syncTrain() {
+  $$('[data-trtarget]').forEach(b => b.setAttribute('aria-pressed', b.dataset.trtarget === train.target));
+  $$('[data-trsize]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.trsize === +train.size));
+  $$('[data-trbell]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.trbell === +train.bell));
+  $$('[data-trsound]').forEach(b => b.setAttribute('aria-pressed', b.dataset.trsound === train.sound));
+  $$('[data-trkey]').forEach(el => { const k = el.dataset.trkey; if (el.type === 'checkbox') el.checked = !!train[k]; else el.value = train[k]; });
+  $('#trSizeRow').hidden = train.target === 'candle';
+  $('#trBrightOut').textContent = train.bright + '%'; $('#trGazeOut').textContent = train.gaze + ' min';
+  $('#trPrepOut').textContent = train.prepMin > 0 ? train.prepMin + ' min' : 'off';
+  $('#trTargetNote').textContent = { white: 'A small white point in darkness. The classic starting target.',
+    black: 'A black point on a soft white field. Brightness is capped so the white stays comfortable.',
+    candle: 'A still candle flame glowing in the dark, the traditional trataka target. It doesn\'t flicker, so your gaze can rest on the brightest part of the flame.' }[train.target];
+  $('#trPlan').textContent = (train.prepMin > 0 ? `${train.prepMin} min slow breathing · ` : '') + `${train.gaze} min on the ${train.target === 'candle' ? 'flame' : 'point'}`
+    + (train.bell ? ` · a soft bell every ${train.bell === 1 ? 'minute' : train.bell + ' min'}` : '') + (train.after ? ' · 90 s afterimage with eyes closed' : '') + ` · about ${trainMinutes()} min`;
+  $('#trVR').disabled = !navigator.xr;
+  renderTrainCards();
+}
+document.addEventListener('input', e => {
+  const k = e.target.dataset?.trkey; if (!k) return;
+  train[k] = e.target.type === 'checkbox' ? e.target.checked : +e.target.value;
+  store.set('gf-train', train); syncTrain();
+});
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-trtarget]'), z = e.target.closest('[data-trsize]'), bl = e.target.closest('[data-trbell]'), s = e.target.closest('[data-trsound]');
+  if (t) train.target = t.dataset.trtarget; else if (z) train.size = +z.dataset.trsize; else if (bl) train.bell = +bl.dataset.trbell; else if (s) train.sound = s.dataset.trsound; else return;
+  store.set('gf-train', train); syncTrain();
+});
+$('#trFS').addEventListener('click', () => startFS(trainCfg()));
+$('#trVR').addEventListener('click', () => startVR(trainCfg()));
+
+// Home: Flicker, Breath, Field and Train tabs
 function setHomeTab(tab) {
   $$('[data-hometab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.hometab === tab));
-  $('#homeFlicker').hidden = tab !== 'flicker'; $('#homeBreath').hidden = tab !== 'breath'; $('#homeField').hidden = tab !== 'field';
+  $('#homeFlicker').hidden = tab !== 'flicker'; $('#homeBreath').hidden = tab !== 'breath'; $('#homeField').hidden = tab !== 'field'; $('#homeTrain').hidden = tab !== 'train';
   $('#buildOwn').hidden = tab !== 'flicker';
   try { localStorage.setItem('gf-hometab', tab); } catch {}
 }
 document.addEventListener('click', e => { const t = e.target.closest('[data-hometab]'); if (t) setHomeTab(t.dataset.hometab); });
 setHomeTab((() => { try { return localStorage.getItem('gf-hometab') || 'flicker'; } catch { return 'flicker'; } })());
-syncJourney(); syncField();
+syncJourney(); syncField(); syncTrain();
 
 // ================= Boot =================
 renderPresets();
@@ -2856,6 +3028,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
               tab: (() => { try { return localStorage.getItem('gf-lobbytab') || 'flicker'; } catch { return 'flicker'; } })() };
   function journeys() {
     if (L.tab === 'breath') return Object.entries(BREATH_STYLES).map(([k, v]) => ({ name: v.name, breath: k, short: v.short }));
+    if (L.tab === 'train') return Object.entries(EXERCISES).map(([k, v]) => ({ name: v.name, train: { ...train, ex: k }, short: v.short }));
     if (L.tab === 'field') return FIELD_PRESETS.map(p => ({ name: p.name, field: { ...field, ...p.set }, short: p.short }))
       .concat([{ name: 'Your field', field: { ...field }, short: 'Your color, sound and length from the flat screen.' }]);
     const list = [{ name: 'Your setup', cfg: null, short: 'Your current settings from the flat screen.' }]
@@ -2880,10 +3053,10 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     cx.lineWidth = 4; cx.strokeStyle = edge; cx.stroke();
     if (L.view === 'journeys') {
       text('Choose a journey', 90, 150, `800 88px ${F.disp}`, C.fg);
-      const TW = 220, TG = 16, tabs = [['flicker', 'Flicker'], ['breath', 'Breath'], ['field', 'Field']], tx0 = PW - 90 - tabs.length * TW - (tabs.length - 1) * TG;
+      const TW = 196, TG = 14, tabs = [['flicker', 'Flicker'], ['breath', 'Breath'], ['field', 'Field'], ['train', 'Train']], tx0 = PW - 90 - tabs.length * TW - (tabs.length - 1) * TG;
       tabs.forEach(([k, label], i) =>
-        pill('tab-' + k, tx0 + i * (TW + TG), 82, TW, 96, label, { selected: L.tab === k, size: 42 }, () => { L.tab = k; try { localStorage.setItem('gf-lobbytab', k); } catch {} panelDirty = true; }));
-      pill('journal', tx0 - 40 - 230, 82, 230, 96, 'Journal', { size: 42 }, () => openVRJournal());
+        pill('tab-' + k, tx0 + i * (TW + TG), 82, TW, 96, label, { selected: L.tab === k, size: 40 }, () => { L.tab = k; try { localStorage.setItem('gf-lobbytab', k); } catch {} panelDirty = true; }));
+      pill('journal', tx0 - 30 - 210, 82, 210, 96, 'Journal', { size: 40 }, () => openVRJournal());
       text('Point and pull the trigger to choose · squeeze the grip to bring this panel in front of you', 92, 212, `400 36px ${F.body}`, C.muted);
       const items = journeys(), cols = 3, gx = 30, cw = (PW - 180 - gx * (cols - 1)) / cols, ch = 214;
       items.forEach((it, i) => {
@@ -2892,7 +3065,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
           rr(x, y, cw, ch, 28); cx.fillStyle = hi ? C.cardHi : C.card; cx.fill();
           cx.lineWidth = 3; cx.strokeStyle = hi ? C.accent : C.line; cx.stroke();
           text(it.name, x + 34, y + 68, `500 46px ${F.body}`, C.fg);
-          text(it.breath ? `breath only · ~${styleMinutes(it.breath)} min` : it.field ? `no flicker · ~${fieldMinutes(it.field)} min` : metaOf(it.cfg), x + 34, y + 116, `400 32px ${F.mono}`, C.muted);
+          text(it.breath ? `breath only · ~${styleMinutes(it.breath)} min` : it.field ? `no flicker · ~${fieldMinutes(it.field)} min` : it.train ? `focus · ~${trainMinutes(it.train)} min` : metaOf(it.cfg), x + 34, y + 116, `400 32px ${F.mono}`, C.muted);
           ticker(it.short, x + 34, y + 166, cw - 68, `400 33px ${F.body}`, it.caution ? C.warn : hi ? C.fg : C.muted, hi, hoverSince.get('j' + i) || 0);
         }, () => { L.sel = it; L.view = 'detail'; panelDirty = true; });
       });
@@ -2909,6 +3082,22 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
         ambOn = !ambOn; try { localStorage.setItem('gf-amb', ambOn ? 'on' : 'off'); } catch {} panelDirty = true;
       });
       pill('exit', PW - 90 - 260, by, 260, 80, 'Exit VR', { size: 38 }, () => exit());
+    } else if (L.view === 'detail' && L.sel.train) {
+      const tr = L.sel.train, ex = EXERCISES[tr.ex];
+      text('TRAIN', 92, 120, `400 32px ${F.mono}`, C.accent);
+      text(ex.name, 90, 220, `800 96px ${F.disp}`, C.fg);
+      text(`~${trainMinutes(tr)} min · ${TRAIN_TARGETS[tr.target].toLowerCase()} · ${roomOf(roomId).name}`, 92, 290, `400 38px ${F.mono}`, C.muted);
+      const n = wrap(ex.about, 92, 370, 1840, 54, `400 40px ${F.body}`, C.fg, 5);
+      wrap(trainDescribe(trainCfg(tr)), 92, 380 + n * 54 + 24, 1840, 44, `400 32px ${F.mono}`, C.muted, 2);
+      // target choice right here, so you can switch without leaving the headset
+      Object.entries(TRAIN_TARGETS).forEach(([k, label], i) => {
+        cx.font = `500 36px ${F.body}`;
+        pill('trt-' + k, 92 + i * 520, 690, 500, 84, label, { selected: tr.target === k, size: 36 }, () => { tr.target = k; train.target = k; store.set('gf-train', train); });
+      });
+      rr(90, 830, 1860, 150, 24); cx.fillStyle = 'rgba(255,179,71,0.08)'; cx.fill(); cx.strokeStyle = 'rgba(255,179,71,0.5)'; cx.lineWidth = 3; cx.stroke();
+      wrap('Sit upright. Rest your gaze on the ' + (tr.target === 'candle' ? 'flame' : 'point') + ' and blink when you need to.' + (tr.after ? ' At the chime, close your eyes and hold the afterimage.' : '') + ' Pull the trigger at any time to stop.', 130, 890, 1780, 46, `400 36px ${F.body}`, C.warn, 2);
+      pill('back', 90, 1060, 300, 120, 'Back', { size: 44 }, () => { L.view = 'journeys'; panelDirty = true; });
+      pill('begin', PW - 90 - 640, 1060, 640, 120, 'Begin', { primary: true, size: 54 }, () => begin());
     } else if (L.view === 'detail' && L.sel.field) {
       const f = L.sel.field, col = (FIELD_COLORS[f.color] || FIELD_COLORS.rose);
       text('FIELD', 92, 120, `400 32px ${F.mono}`, C.accent);
@@ -3021,7 +3210,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   function useEntry(e) {
     stopVRAudio();
     const st = STYLE_OF[e.cfg.kind];
-    L.sel = e.cfg.kind === 'field' ? { name: 'From your journal', field: fieldFromCfg(e.cfg) } : st ? { name: BREATH_STYLES[st].name, breath: st, short: BREATH_STYLES[st].short }
+    L.sel = e.cfg.kind === 'train' ? { name: 'From your journal', train: trainFromCfg(e.cfg) } : e.cfg.kind === 'field' ? { name: 'From your journal', field: fieldFromCfg(e.cfg) } : st ? { name: BREATH_STYLES[st].name, breath: st, short: BREATH_STYLES[st].short }
                : { name: 'From your journal', cfg: { ...e.cfg }, why: `The same settings as your session on ${fmtDate(e.date)}` + (e.rating ? `, rated ${e.rating} out of 5.` : '.') };
     L.view = 'detail';
   }
@@ -3321,7 +3510,8 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     if (xr) startAmbience();
   }
   function begin() {
-    if (L.sel.field) L.override = fieldCfg(L.sel.field);
+    if (L.sel.train) L.override = trainCfg(L.sel.train);
+    else if (L.sel.field) L.override = fieldCfg(L.sel.field);
     else if (L.sel.breath) { if (!styleReady(L.sel.breath)) return; L.override = cfgFor(L.sel.breath); }
     else { L.override = null; if (L.sel.cfg) { Object.assign(state, DEFAULTS, L.sel.cfg); delete state.kind; } changed(); }
     mode = 'fadeout'; fadeTarget = 0;
@@ -3481,7 +3671,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     hovered = new Set(hover ? [hover] : []); if (hover) hoverSince.set(hover, performance.now() - hoverAgo);
     const g = canvas.getContext('webgl2', { antialias: true }) || canvas.getContext('webgl');
     init(g); roomId = id; bake(roomOf(id));
-    L.view = view; if (view === 'detail') L.sel = journeys()[1];
+    L.view = view; if (view === 'detail') L.sel = journeys()[1] || journeys()[0];
     if (lset) Object.assign(L, lset);
     const eye = [0, 1.6, 0];
     const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
