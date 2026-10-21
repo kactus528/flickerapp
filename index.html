@@ -797,6 +797,14 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         </div>
         <p class="note" id="fEyesNote"></p>
       </div>
+      <div class="row" id="fDotRow">
+        <label class="toggle"><input type="checkbox" data-fkey="dot"> Focus dot in the center</label>
+        <div class="presets" id="fDotSize" role="group" aria-label="Dot size">
+          <button class="chip" data-fdotsize="0.35">Small</button>
+          <button class="chip" data-fdotsize="0.7">Medium</button>
+        </div>
+        <p class="note">A small dot, a darker shade of the field color, gives your eyes somewhere to rest so they don't wander. The classic Ganzfeld has no dot, so try both.</p>
+      </div>
       <div class="row">
         <span class="lbl">Sound</span>
         <div class="presets" id="fSound" role="group" aria-label="Sound">
@@ -2373,7 +2381,7 @@ const FIELD_COLORS = {
   azure: { name: 'Soft blue', hex: '#90aad0' }, violet: { name: 'Violet', hex: '#aa98cc' }
 };
 const FIELD_SOUNDS = { pink: 'pink noise', white: 'white noise', brown: 'brown noise', none: 'no added sound' };
-const FIELD_DEFAULTS = { color: 'rose', visual: 'flat', sound: 'pink', eyes: 'open', mins: 15, prepMin: 3, bright: 35, vol: 30 };
+const FIELD_DEFAULTS = { color: 'rose', visual: 'flat', sound: 'pink', eyes: 'open', mins: 15, prepMin: 3, bright: 35, vol: 30, dot: false, dotSize: 0.35 };
 const FIELD_PRESETS = [
   { name: 'Classic Ganzfeld', short: 'Rose light and soft pink noise, eyes open. The traditional lab setup.',
     set: { visual: 'flat', color: 'rose', sound: 'pink', eyes: 'open', mins: 15, bright: 35 } },
@@ -2387,21 +2395,25 @@ const FIELD_PRESETS = [
     set: { color: 'neutral', visual: 'static', sound: 'white', eyes: 'open', mins: 15, bright: 50 } }
 ];
 const field = Object.assign({}, FIELD_DEFAULTS, store.get('gf-field') || {});
+if (![0.35, 0.7].includes(+field.dotSize)) field.dotSize = 0.35;
 if ('prep' in field) { if (!('prepMin' in (store.get('gf-field') || {}))) field.prepMin = field.prep ? 3 : 0; delete field.prep; }   // older saved setting
 const prepRounds = m => Math.round(m * 60 / 11);   // resonance breaths: 11 s each
+const shadeHex = (hex, k) => '#' + hexRGB(hex).map(v => Math.round(Math.min(1, v * k) * 255).toString(16).padStart(2, '0')).join('');
 function fieldCfg(f = field) {
   const hex = (FIELD_COLORS[f.color] || FIELD_COLORS.rose).hex;
+  const dotOn = !!f.dot && f.eyes === 'open';
   return { ...DEFAULTS, ...BASE, kind: 'field', hz: 10, flash: hex, off: hex, bright: f.bright, mins: f.mins,
            breathOn: f.prepMin > 0, breathPattern: 'res', breathRounds: Math.max(1, prepRounds(f.prepMin)), breathSec: 4, breathVol: 35,
            bgOn: f.sound !== 'none', bg: f.sound === 'none' ? 'pink' : f.sound, bgVol: f.vol, bgSwell: false,
            iso: false, bin: false, drumOn: false, hzShow: false, ending: 'wake',
-           fColor: f.color, fVisual: f.visual || 'flat', fSound: f.sound, fEyes: f.eyes, fPrepMin: f.prepMin, fVol: f.vol };
+           dot: dotOn, dotColor: shadeHex(hex, f.visual === 'static' ? 0.12 : 0.45), dotSize: f.dotSize || 0.35, dotMode: 'steady',   // darker on static so it stands out from the grain
+           fColor: f.color, fVisual: f.visual || 'flat', fSound: f.sound, fEyes: f.eyes, fPrepMin: f.prepMin, fVol: f.vol, fDot: dotOn, fDotSize: f.dotSize || 0.35 };
 }
-const fieldFromCfg = c => ({ color: c.fColor || 'rose', visual: c.fVisual || 'flat', sound: c.fSound || 'pink', eyes: c.fEyes || 'open', mins: c.mins, prepMin: c.fPrepMin ?? (c.fPrep ? 3 : 0), bright: c.bright, vol: c.fVol || c.bgVol || 30 });
+const fieldFromCfg = c => ({ color: c.fColor || 'rose', visual: c.fVisual || 'flat', sound: c.fSound || 'pink', eyes: c.fEyes || 'open', mins: c.mins, prepMin: c.fPrepMin ?? (c.fPrep ? 3 : 0), dot: !!c.fDot, dotSize: c.fDotSize || 0.35, bright: c.bright, vol: c.fVol || c.bgVol || 30 });
 const fieldMinutes = (f = field) => Math.round(prepRounds(f.prepMin) * 11 / 60 + f.mins + 0.1);
 function fieldDescribe(c) {
   const f = fieldFromCfg(c);
-  return `${(FIELD_COLORS[f.color] || FIELD_COLORS.rose).name} ${f.visual === 'static' ? 'static' : 'field'} · ${FIELD_SOUNDS[f.sound]} · eyes ${f.eyes} · ${f.mins} min` + (f.prepMin > 0 ? ` · ${f.prepMin} min breathing first` : '');
+  return `${(FIELD_COLORS[f.color] || FIELD_COLORS.rose).name} ${f.visual === 'static' ? 'static' : 'field'} · ${FIELD_SOUNDS[f.sound]} · eyes ${f.eyes}${f.dot ? ' · focus dot' : ''} · ${f.mins} min` + (f.prepMin > 0 ? ` · ${f.prepMin} min breathing first` : '');
 }
 function renderFieldCards() {
   const box = $('#fieldCards'); box.innerHTML = '';
@@ -2420,6 +2432,9 @@ function syncField() {
     `<button class="chip" data-fcolor="${k}"><span class="swatch-dot" style="background:${v.hex}"></span>${v.name}</button>`).join(''));
   $$('[data-fcolor]').forEach(b => b.setAttribute('aria-pressed', b.dataset.fcolor === field.color));
   $$('[data-feyes]').forEach(b => b.setAttribute('aria-pressed', b.dataset.feyes === field.eyes));
+  $('#fDotRow').hidden = field.eyes !== 'open';
+  $('#fDotSize').hidden = !field.dot;
+  $$('[data-fdotsize]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.fdotsize === +field.dotSize));
   $$('[data-fvisual]').forEach(b => b.setAttribute('aria-pressed', b.dataset.fvisual === (field.visual || 'flat')));
   $('#fVisualNote').textContent = field.visual === 'static'
     ? 'Fine random snow that changes every frame, like a TV on a dead channel. Neutral color gives the classic gray look; the other colors tint it.'
@@ -2442,7 +2457,9 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('click', e => {
   const c = e.target.closest('[data-fcolor]'), y = e.target.closest('[data-feyes]'), s = e.target.closest('[data-fsound]'), v = e.target.closest('[data-fvisual]');
-  if (v) field.visual = v.dataset.fvisual;
+  const ds = e.target.closest('[data-fdotsize]');
+  if (ds) field.dotSize = +ds.dataset.fdotsize;
+  else if (v) field.visual = v.dataset.fvisual;
   else if (c) field.color = c.dataset.fcolor;
   else if (y) { if (field.eyes !== y.dataset.feyes) field.bright = y.dataset.feyes === 'closed' ? Math.max(field.bright, 70) : Math.min(field.bright, 40); field.eyes = y.dataset.feyes; }
   else if (s) field.sound = s.dataset.fsound;
