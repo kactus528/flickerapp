@@ -2473,7 +2473,6 @@ function syncField() {
   $$('[data-fkey]').forEach(el => { const k = el.dataset.fkey; if (el.type === 'checkbox') el.checked = !!field[k]; else el.value = field[k]; });
   $('#fVolOut').textContent = field.vol + '%'; $('#fBrightOut').textContent = field.bright + '%'; $('#fMinsOut').textContent = field.mins + ' min'; $('#fPrepOut').textContent = field.prepMin > 0 ? field.prepMin + ' min' : 'off';
   $('#fBlurOut').textContent = field.blur ? field.blur + '%' : 'off';
-  $('#fBlurRow').hidden = field.visual !== 'static' && !(field.dot && field.eyes === 'open');
   $('#fVolRow').hidden = field.sound === 'none';
   $('#fEyesNote').textContent = field.eyes === 'open'
     ? 'Eyes open is the classic version: let your gaze rest softly, blink normally, and don\'t try to focus on anything.'
