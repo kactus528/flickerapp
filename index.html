@@ -1924,7 +1924,7 @@ void main(){
   vec3 col = mix(uOff, uFlash, m * uOn);
   if (uStat > 0.001) {
     // TV static: grains about 0.15 degrees across, new random brightness every frame, same average brightness as the field.
-    vec2 cell = floor(q / max(0.0026, 2.0 / uPPR));   // about 3 headset pixels; at least 2 pixels on flat screens
+    vec2 cell = floor(q / max(0.0013, 1.0 / uPPR));   // about 1.5 headset pixels, never smaller than one rendered pixel
     float n = hash12(cell + vec2(uSeed * 17.0, uSeed * 59.0));
     col *= mix(1.0, 2.0 * n, uStat);
   }
@@ -2125,7 +2125,11 @@ async function startVR(override) {
     const canvas = document.createElement('canvas');
     gl = canvas.getContext('webgl', { xrCompatible: true });
     await gl.makeXRCompatible?.();
-    session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+    const layer = new XRWebGLLayer(session, gl);
+    // Quest renders the edges of the view at lower resolution by default (fixed foveation). Uniform light doesn't care,
+    // but fine TV static turns into big blocks there, so render every part of the view at full resolution.
+    try { layer.fixedFoveation = 0; } catch {}
+    session.updateRenderState({ baseLayer: layer });
     R = makeRenderer(gl);
   } catch (e) { err = e.message; return end(); }
 
@@ -2972,7 +2976,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
                : { name: 'From your journal', cfg: { ...e.cfg }, why: `The same settings as your session on ${fmtDate(e.date)}` + (e.rating ? `, rated ${e.rating} out of 5.` : '.') };
     L.view = 'detail';
   }
-  let vrStop = null, vrAudio = null;
+  let vrStop = null, vrAudio = null, savedFov = null;
   async function vrRecord() {
     if (L.rec) { vrStop?.(); return; }
     stopVRAudio(); L.recMsg = '';
@@ -3276,6 +3280,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   async function finish(reason) {
     if (!S) return;
     const done = S; S = null;
+    if (savedFov !== null) { try { xr.renderState.baseLayer.fixedFoveation = savedFov; } catch {} savedFov = null; }
     done.stopAudio();
     mode = 'fadein'; fade = 0; fadeTarget = 1; placed = false;   // re-center the panel where you are now looking
     const entry = await logEntry(done, reason);
@@ -3362,7 +3367,11 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     // Fades: room out before a session, back in after.
     const speed = mode === 'fadeout' ? 1 / 2.5 : 1 / 3;
     fade += Math.sign(fadeTarget - fade) * Math.min(Math.abs(fadeTarget - fade), dt * speed);
-    if (mode === 'fadeout' && fade <= 0.001) { S = createSession('vr', L.override); mode = 'running'; }
+    if (mode === 'fadeout' && fade <= 0.001) {
+      S = createSession('vr', L.override); mode = 'running';
+      // Fine TV static needs full resolution at the edges of the view too (see fixed foveation in the direct VR start).
+      if (S.cfg.fVisual === 'static') { try { const ly = xr.renderState.baseLayer; savedFov = ly.fixedFoveation; ly.fixedFoveation = 0; } catch {} }
+    }
     if (mode === 'fadein' && fade >= 0.999) mode = 'menu';
     const showPanel = mode === 'menu' || mode === 'fadein';
     if (amb && sharedAudioCtx) {
