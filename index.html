@@ -58,6 +58,12 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .seg button { font: inherit; font-size: 0.95rem; color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 8px 22px; cursor: pointer; }
 .seg.tabs { justify-self: stretch; grid-template-columns: repeat(4, 1fr); }
 .seg.tabs button { font-family: var(--display); font-weight: 700; font-size: 1rem; padding: 10px 4px; }
+.dojo-res { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--panel); }
+.dojo-res dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 0.9rem; }
+.dojo-res dt { color: var(--muted); } .dojo-res dd { margin: 0; font-family: var(--mono, ui-monospace, monospace); }
+.dojo-res svg { width: 100%; height: auto; display: block; }
+.dojo-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.78rem; color: var(--muted); }
+.dojo-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .swatch-dot { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 50%; margin-right: 0.45em; vertical-align: -0.05em; border: 1px solid rgba(255,255,255,0.25); }
 .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: 500; }
 .seg button:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
@@ -853,9 +859,28 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
     <div class="screen-head">
       <p class="eyebrow">Train</p>
       <h2 id="h-train">The Stillpoint</h2>
-      <p class="note">A single still point in the dark. Rest your attention on it. When your mind wanders, and it will, notice that it wandered and gently come back to the point. Each return is the exercise, not a failure. Inspired by focused-attention meditation and trataka, the yogic practice of steady gazing.</p>
+      <p class="note" data-ex="dojo">Keep your attention on the point while soft sounds and lights come and go around you. You don't need to fight them or follow them: notice, let go, and return. Distractions are gentle by design, with no flashes and no startling sounds.</p>
+      <p class="note" data-ex="stillpoint">A single still point in the dark. Rest your attention on it. When your mind wanders, and it will, notice that it wandered and gently come back to the point. Each return is the exercise, not a failure. Inspired by focused-attention meditation and trataka, the yogic practice of steady gazing.</p>
     </div>
     <div class="controls">
+      <div class="row" data-ex="dojo">
+        <span class="lbl">Mode</span>
+        <div class="presets" id="djMode" role="group" aria-label="Dojo mode">
+          <button class="chip" data-djmode="temple">Temple</button>
+          <button class="chip" data-djmode="gate">Gatekeeper</button>
+        </div>
+        <p class="note" id="djModeNote"></p>
+      </div>
+      <div class="row" data-ex="dojo">
+        <label for="djFreq">How often <output id="djFreqOut"></output></label>
+        <input type="range" id="djFreq" data-trkey="djFreq" min="1" max="5" step="1">
+      </div>
+      <div class="row" data-ex="dojo">
+        <label for="djSal">How noticeable <output id="djSalOut"></output></label>
+        <input type="range" id="djSal" data-trkey="djSal" min="1" max="5" step="1">
+        <p class="note">More noticeable distractions are a little louder, brighter and closer to the point, but never sudden or startling.</p>
+      </div>
+      <label class="toggle" data-ex="dojo"><input type="checkbox" data-trkey="djRandom"> Unpredictable timing</label>
       <div class="row">
         <span class="lbl">Target</span>
         <div class="presets" id="trTarget" role="group" aria-label="Target">
@@ -889,7 +914,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <label for="trGaze">Time on the point <output id="trGazeOut"></output></label>
         <input type="range" id="trGaze" data-trkey="gaze" min="2" max="30" step="1">
       </div>
-      <div class="row">
+      <div class="row" data-ex="stillpoint">
         <span class="lbl">Return bell</span>
         <div class="presets" id="trBell" role="group" aria-label="Return bell">
           <button class="chip" data-trbell="0">Off</button>
@@ -899,7 +924,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         </div>
         <p class="note">A soft bell that asks: where is your attention? If it drifted, come back to the point.</p>
       </div>
-      <label class="toggle"><input type="checkbox" data-trkey="after"> End with the afterimage: at a chime the light goes out; close your eyes and hold the glowing afterimage for 90 seconds</label>
+      <label class="toggle" data-ex="stillpoint"><input type="checkbox" data-trkey="after"> End with the afterimage: at a chime the light goes out; close your eyes and hold the glowing afterimage for 90 seconds</label>
       <div class="row">
         <span class="lbl">Sound</span>
         <div class="presets" id="trSound" role="group" aria-label="Sound">
@@ -915,6 +940,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
       </div>
     </div>
     <p class="plan" id="trPlan"></p>
+    <p class="note" data-ex="dojo" id="djControls"></p>
     <p class="note">Sit upright and comfortable. Blink when you need to; there's no need to strain. Pull the trigger in VR, or tap the screen in fullscreen, to stop.</p>
     <div class="foot">
       <button class="go secondary" id="trFS" type="button">Fullscreen</button>
@@ -942,6 +968,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
   <div class="sheet">
     <h2 id="jh">What did you see?</h2>
     <p class="note" id="jSum"></p>
+    <div id="jDojo" class="dojo-res" hidden></div>
     <div class="row">
       <span class="lbl">How strong were the visuals?</span>
       <div class="stars" id="jStars" role="group" aria-label="Rating">
@@ -1650,6 +1677,125 @@ function ramp(param, v, at, tc) {
 let sharedAudioCtx = null;
 
 // ================= Session engine =================
+// ================= Distraction Dojo: schedule of distractions and targets =================
+// Every distraction is synthesized: no sound or image files. Visual ones fade in and out slowly (no flashing),
+// sounds are soft and placed around you in 3D. Positions are angles from the anchor: az left/right, el up/down.
+const DJ_AUDIO = ['bell', 'tone', 'knock', 'steps', 'wind', 'rhythm', 'melody', 'drop', 'move'];
+const DJ_VISUAL = ['orb', 'drift', 'ring', 'shift', 'light'];
+const DJ_LABEL = { bell: 'Bell', tone: 'Tone', knock: 'Knock', steps: 'Footsteps', wind: 'Wind', rhythm: 'Rhythm', melody: 'Melody',
+  drop: 'Sudden quiet', move: 'Moving tone', orb: 'Glow', drift: 'Drifting light', ring: 'Ring', shift: 'Color change', light: 'Distant light',
+  same: 'Light and sound together', opposite: 'Light and sound apart' };
+const DJ_COLORS = [[0.55, 0.7, 1.0], [1.0, 0.72, 0.42], [0.62, 1.0, 0.75], [0.95, 0.6, 0.95]];
+function rng32(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function makeDojo(cfg) {
+  const R = rng32((Date.now() ^ 0x5bd1e995) >>> 0), rr = (a, b) => a + (b - a) * R(), pick = a => a[Math.floor(R() * a.length)];
+  const len = cfg.trGaze * 60, gate = cfg.djMode === 'gate', freq = cfg.djFreq || 2, sal = cfg.djSal || 2;
+  // Gatekeeper alternates quiet and distracted blocks, so the same session measures both. Temple settles for 45 s first.
+  const blockLen = len >= 360 ? 90 : 60, settle = gate ? 0 : 45;
+  const distractOn = t => t >= settle && (!gate || Math.floor(t / blockLen) % 2 === 1);
+  const mean = [40, 28, 18, 12, 8][freq - 1];
+  const ev = []; let t = gate ? blockLen + rr(3, 8) : settle + rr(3, mean * 0.6), last = '';
+  while (t < len - 6) {
+    if (!distractOn(t)) { t = (Math.floor(t / blockLen) + 1) * blockLen + rr(2, 6); continue; }
+    let type;
+    do { type = R() < 0.1 + 0.04 * sal ? pick(['same', 'opposite']) : R() < 0.55 ? pick(DJ_AUDIO) : pick(DJ_VISUAL); } while (type === last);
+    if (type === 'drop' && !cfg.bgOn) type = 'tone';
+    last = type;
+    const visual = DJ_VISUAL.includes(type) || type === 'same' || type === 'opposite';
+    const side = R() < 0.5 ? -1 : 1, ecc = [46, 40, 33, 27, 22][sal - 1] * Math.PI / 180;
+    const az = visual ? side * rr(ecc, ecc + 0.14) : side * rr(0.5, 2.6);   // sounds can come from behind you
+    const el = type === 'light' ? rr(-0.2, -0.1) : visual ? rr(-0.15, 0.18) : rr(-0.15, 0.35);
+    const where = Math.abs(az) > 2.1 ? 'behind' : az < 0 ? 'left' : 'right';
+    ev.push({ t, type, az, el, visual, dur: type === 'drift' ? 7 : type === 'wind' ? 4 : type === 'move' ? 3.5 : visual ? 4.5 : 2,
+              label: DJ_LABEL[type] + (type === 'drop' ? '' : `, ${where}`), hue: Math.floor(R() * 4), hue2: Math.floor(R() * 4), base: rr(0, 1) });
+    t += cfg.djRandom ? mean * rr(0.35, 1.65) : mean;
+  }
+  // Gatekeeper targets: the point briefly fades. Pull the trigger within 1.5 s.
+  const targets = [];
+  if (gate) { let u = rr(6, 10); while (u < len - 4) { targets.push({ t: u, hit: false, rt: null, dis: distractOn(u), logged: false, missed: false }); u += rr(6, 14); } }
+  return { len, gate, blockLen, settle, distractOn, ev, targets, log: [], away: null, awayN: 0, awayT: 0, sal };
+}
+// One-line summary of a Dojo result, for the journal.
+function dojoLine(d) {
+  if (!d) return '';
+  if (d.mode === 'gate') return `Gatekeeper · caught ${d.hits} of ${d.targets}` + (d.rt ? ` · ${d.rt} ms` : '') + (d.fas ? ` · ${d.fas} false press${d.fas > 1 ? 'es' : ''}` : '')
+    + (d.cost !== null && d.cost !== undefined ? ` · distraction cost ${d.cost >= 0 ? '+' : ''}${d.cost} ms` : '');
+  return `Temple · ${d.distractions} distractions · noticed drifting ${d.reports}×` + (d.away !== undefined ? ` · looked away ${d.away}×` : '');
+}
+// Timeline marks for the replay strip, in 0..1 time and lane rows. Drawn by the flat journal (SVG) and the VR lobby (canvas).
+function dojoMarks(d) {
+  const len = Math.max(1, d.len), m = [];
+  if (d.mode === 'gate') for (let s = d.blockLen; s < len; s += 2 * d.blockLen) m.push({ k: 'block', x: s / len, w: Math.min(d.blockLen, len - s) / len });
+  let awayStart = null;
+  d.log.forEach(([t, k, x]) => {
+    const p = Math.min(1, t / len);
+    if (k === 'd') m.push({ k: 'dis', x: p, label: x });
+    else if (k === 't') m.push({ k: 'target', x: p });
+    else if (k === 'h') m.push({ k: 'hit', x: p });
+    else if (k === 'm') m.push({ k: 'miss', x: p });
+    else if (k === 'f') m.push({ k: 'fa', x: p });
+    else if (k === 'r') m.push({ k: 'report', x: p });
+    else if (k === 'a') awayStart = p;
+    else if (k === 'b' && awayStart !== null) { m.push({ k: 'away', x: awayStart, w: Math.max(0.004, p - awayStart) }); awayStart = null; }
+  });
+  if (awayStart !== null) m.push({ k: 'away', x: awayStart, w: Math.max(0.004, 1 - awayStart) });
+  return m;
+}
+// Labelled numbers for a Dojo result. Kept separate on purpose: there is no single "focus score".
+function dojoStats(d) {
+  const ms = v => v === null || v === undefined ? '–' : v + ' ms', pc = v => v === null || v === undefined ? '–' : v + '%';
+  const away = d.away === undefined ? [] : [['Looked away', `${d.away}× · ${d.awaySecs} s in total`]];
+  if (d.mode === 'gate') return [['Caught', `${d.hits} of ${d.targets}`], ['Average reaction', ms(d.rt)], ['False presses', String(d.fas)],
+    ['Quiet stretches', `${ms(d.rtQuiet)} · ${pc(d.hitQuiet)} caught`], ['With distractions', `${ms(d.rtDistract)} · ${pc(d.hitDistract)} caught`],
+    ['Distraction cost', d.cost === null || d.cost === undefined ? 'needs 3+ catches in each kind of stretch' : `${d.cost >= 0 ? '+' : ''}${d.cost} ms`]].concat(away);
+  return [['Distractions', String(d.distractions)], ['Noticed drifting', `${d.reports}×`]].concat(away.length ? away : [['Looked away', 'measured in VR only']]);
+}
+const DJ_NOTE = { gate: 'Distraction cost is how much slower you reacted with distractions around than without. Compare it between sessions with the same settings.',
+  temple: 'Noticing your mind drift more often is not worse focus: noticing is the skill this practice builds.' };
+function renderDojoResult(el, d) {
+  el.hidden = !d; el.innerHTML = ''; if (!d) return;
+  const h = document.createElement('b'); h.textContent = d.mode === 'gate' ? 'Gatekeeper results' : 'Temple session';
+  const dl = document.createElement('dl');
+  dojoStats(d).forEach(([k, v]) => { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; dl.append(dt, dd); });
+  // replay strip: distractions on top, your responses in the middle, looking away at the bottom
+  const NS = 'http://www.w3.org/2000/svg', W = 600, svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} 100`); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Session replay timeline');
+  const add = (tag, at) => { const n = document.createElementNS(NS, tag); Object.entries(at).forEach(([k, v]) => n.setAttribute(k, v)); svg.append(n); return n; };
+  add('rect', { x: 0, y: 0, width: W, height: 88, fill: 'rgba(255,255,255,0.03)', rx: 4 });
+  dojoMarks(d).forEach(m => {
+    const x = m.x * W, c = DJ_MARK_COLOR[m.k];
+    if (m.k === 'block') add('rect', { x, y: 0, width: m.w * W, height: 88, fill: c });
+    else if (m.k === 'dis') { const l = add('line', { x1: x, x2: x, y1: 6, y2: 26, stroke: c, 'stroke-width': 2, 'stroke-linecap': 'round' }); const tt = document.createElementNS(NS, 'title'); tt.textContent = m.label; l.append(tt); }
+    else if (m.k === 'target') add('line', { x1: x, x2: x, y1: 38, y2: 58, stroke: c, 'stroke-width': 1.5 });
+    else if (m.k === 'away') add('rect', { x, y: 70, width: m.w * W, height: 10, rx: 3, fill: c });
+    else add('circle', { cx: x, cy: 48, r: m.k === 'report' ? 4.5 : 4, fill: c });
+  });
+  const lbl = (x, a, txt) => { const t = add('text', { x, y: 98, fill: '#9a93a8', 'font-size': 10, 'text-anchor': a }); t.textContent = txt; };
+  lbl(2, 'start', '0'); lbl(W - 2, 'end', fmtDur(d.len));
+  const legend = document.createElement('div'); legend.className = 'dojo-legend';
+  const items = [['dis', 'distraction'], ...(d.mode === 'gate' ? [['hit', 'caught'], ['miss', 'missed'], ['fa', 'false press']] : [['report', 'noticed drifting']]), ...(d.away !== undefined ? [['away', 'looked away']] : [])];
+  items.forEach(([k, t]) => { const s = document.createElement('span'); s.innerHTML = `<i style="background:${DJ_MARK_COLOR[k]}"></i>`; s.append(t); legend.append(s); });
+  if (d.mode === 'gate') { const s = document.createElement('span'); s.innerHTML = '<i style="background:rgba(255,255,255,0.25);border-radius:2px"></i>'; s.append('shaded: stretches with distractions'); legend.append(s); }
+  const note = document.createElement('p'); note.className = 'note'; note.style.margin = '0'; note.textContent = DJ_NOTE[d.mode];
+  el.append(h, dl, svg, legend, note);
+}
+const DJ_MARK_COLOR = { block: 'rgba(255,255,255,0.07)', dis: '#9a93a8', target: '#6b6577', hit: '#7ad7a0', miss: '#ff5a4e', fa: '#ffb347', report: '#8fb4ff', away: '#c58cff' };
+// Project a world point into a view; returns screen pixels or null when it's behind you.
+function projectPx(view, vp, P) {
+  const m = view.transform.inverse.matrix, pm = view.projectionMatrix;
+  const v = [0, 1, 2, 3].map(i => m[i] * P[0] + m[4 + i] * P[1] + m[8 + i] * P[2] + m[12 + i] * P[3]);
+  const c = [0, 1, 2, 3].map(i => pm[i] * v[0] + pm[4 + i] * v[1] + pm[8 + i] * v[2] + pm[12 + i] * v[3]);
+  if (c[3] <= 0.01) return null;
+  return [vp.x + (c[0] / c[3] * 0.5 + 0.5) * vp.width, vp.y + (c[1] / c[3] * 0.5 + 0.5) * vp.height];
+}
+// Draw a Dojo session in one VR view: anchor fixed in the room, distractions at their places around it.
+function dojoDraw(R, F, S, view, vp, eyeIdx) {
+  const ppr = view.projectionMatrix[0] * vp.width / 2;
+  const a = projectPx(view, vp, S.anchorW) || [vp.x - 1e5, vp.y - 1e5];
+  F.disQ = (F.dis || []).map(d => { const s = projectPx(view, vp, S.worldPoint(d.az, d.el, 2)); return s ? [(s[0] - a[0]) / ppr, (s[1] - a[1]) / ppr] : null; });
+  R.draw(F, eyeIdx, vp, a[0], a[1], ppr);
+}
+
 // One timeline drives light, tones, background, affirmation and the ending, for both VR and fullscreen.
 function createSession(mode, override) {
   const cfg = override ? { ...DEFAULTS, ...override } : { ...state };
@@ -1677,6 +1823,41 @@ function createSession(mode, override) {
   const B = PROG ? PROG.total : J ? JA + JB + JR : (cfg.breathOn ? cfg.breathRounds * cycle : 0);
   const EASE = Math.max(1, J ? 60 : (cfg.breathOn ? 2 * cycle : 0));
   const S = { cfg, mode, t: 0, T: 0, total: B + total, done: false, startedAt: new Date() };
+  const DJ = TRAIN && cfg.trEx === 'dojo' ? makeDojo(cfg) : null;
+  S.dojo = DJ;
+  // Anchor frame: where you faced when the session started. VR sets it from the head pose; flat mode keeps the default.
+  S.af = { O: [0, 0, 0], f: [0, 0, -1], r: [1, 0, 0] }; S.anchorW = [0, 0, -2, 1];
+  S.worldPoint = (az, el, d = 2) => {
+    const { O, f, r } = S.af, ca = Math.cos(az), sa = Math.sin(az), ce = Math.cos(el), se = Math.sin(el);
+    return [O[0] + (f[0] * ca + r[0] * sa) * ce * d, O[1] + se * d, O[2] + (f[2] * ca + r[2] * sa) * ce * d, 1];
+  };
+  S.setAnchor = m => {
+    const O = [m[12], m[13], m[14]]; let f = [-m[8], 0, -m[10]]; const n = Math.hypot(f[0], f[2]) || 1; f = [f[0] / n, 0, f[2] / n];
+    S.af = { O, f, r: [-f[2], 0, f[0]] }; S.anchorW = S.worldPoint(0, 0, 2);
+  };
+  // Called every VR frame with the head pose: sets the anchor on the first frame, logs looking away, steers 3D sound.
+  S.trackHead = m => {
+    if (!S.anchored) { S.setAnchor(m); S.anchored = true; }
+    const pos = [m[12], m[13], m[14]], fwd = [-m[8], -m[9], -m[10]], up = [m[4], m[5], m[6]];
+    const to = [S.anchorW[0] - pos[0], S.anchorW[1] - pos[1], S.anchorW[2] - pos[2]], n = Math.hypot(...to) || 1;
+    S.head(Math.acos(Math.max(-1, Math.min(1, (fwd[0] * to[0] + fwd[1] * to[1] + fwd[2] * to[2]) / n))) * 180 / Math.PI);
+    S.setListener(pos, fwd, up);
+  };
+  S.head = deg => {
+    if (!DJ || S.t < 0 || S.t > DJ.len) return;
+    if (DJ.away === null && deg > 20) { DJ.away = S.t; DJ.awayN++; DJ.log.push([S.t, 'a']); }
+    else if (DJ.away !== null && deg < 12) { DJ.awayT += S.t - DJ.away; DJ.away = null; DJ.log.push([S.t, 'b']); }
+  };
+  // The response button: Gatekeeper = "the point faded", Temple = "I noticed I drifted".
+  S.respond = () => {
+    if (!DJ || S.t < 0 || S.t > DJ.len) return false;
+    const t = S.t;
+    if (DJ.gate) {
+      const tg = DJ.targets.find(x => !x.hit && t >= x.t && t <= x.t + 1.5);
+      if (tg) { tg.hit = true; tg.rt = t - tg.t; DJ.log.push([t, 'h', Math.round(tg.rt * 1000)]); } else DJ.log.push([t, 'f']);
+    } else DJ.log.push([t, 'r']);
+    return true;
+  };
   const ease = f => f * f * (3 - 2 * f);
   // 0..1 breath shape: in (rise), hold full, out (fall), hold empty.
   function breathShape(T) {
@@ -1880,7 +2061,7 @@ function createSession(mode, override) {
         if (guide > 0.2 && cyc !== A.lastStep) chime(A.ctx, A.breathChime, at + 0.02, 660);
         A.lastStep = cyc;
       }
-      ramp(A.bg.gain, cfg.bgVol / 100 * sound, at, 0.08);
+      ramp(A.bg.gain, cfg.bgVol / 100 * sound * (A.dropUntil && t < A.dropUntil && t > A.dropUntil - 2.3 ? 0 : 1), at, A.dropUntil && Math.abs(t - A.dropUntil) < 2.4 ? 0.12 : 0.08);
       if (PROG && A.pBed) {
         const v = A.pVol * sound;
         ramp(A.pBed.gain, (cfg.kind === 'nadi' ? 0.14 : 0.22) * v, at, 0.6);
@@ -1959,6 +2140,29 @@ function createSession(mode, override) {
       }
     }
 
+    // ---- Distraction Dojo: play due distractions, log targets and misses, build the visual list ----
+    let dis = null, tdim = 0;
+    if (DJ && t >= 0) {
+      for (const e of DJ.ev) if (!e.played && t >= e.t) { e.played = true; DJ.log.push([e.t, 'd', e.label]); try { djSound(e); } catch {} }
+      for (const g of DJ.targets) {
+        if (!g.logged && t >= g.t) { g.logged = true; DJ.log.push([g.t, 't']); }
+        if (!g.hit && !g.missed && t > g.t + 1.5) { g.missed = true; DJ.log.push([g.t + 1.5, 'm']); }
+        if (t >= g.t && t < g.t + 0.6) tdim = Math.max(tdim, Math.min(1, (t - g.t) / 0.08, (g.t + 0.6 - t) / 0.08));
+      }
+      const visA = [0.2, 0.28, 0.38, 0.5, 0.62][DJ.sal - 1];
+      dis = [];
+      for (const e of DJ.ev) {
+        if (!e.visual || t < e.t || t > e.t + e.dur || dis.length >= 4) continue;
+        const u = t - e.t, env = Math.min(1, u / 1.2, (e.dur - u) / 1.2), a = Math.max(0, env) * visA * light;
+        let az = e.az, el = e.el, col = DJ_COLORS[e.hue], shape = 0, r = 0.045;
+        if (e.type === 'drift') az = e.az - Math.sign(e.az) * 0.35 * (u / e.dur);
+        if (e.type === 'ring') { shape = 1; r = 0.05; }
+        if (e.type === 'light') { shape = 3; r = 0.05; }
+        if (e.type === 'shift') { const f = clamp01((u - e.dur * 0.4) / 0.8); col = col.map((v, i) => v + (DJ_COLORS[(e.hue2 + (e.hue2 === e.hue ? 1 : 0)) % 4][i] - v) * f); }
+        dis.push({ az, el, r, a, rgb: col, shape });
+      }
+    }
+
     // ---- colors for this frame ----
     const k = cfg.bright / 100 * light;
     // Breath glow: a steady, non-flickering light in the flash color that rises and falls with the breath.
@@ -1972,7 +2176,8 @@ function createSession(mode, override) {
       t, hz, on, light,
       // Rate readout for eyes-open checks. Locked timing shows the exact rate on screen (refresh / frames per cycle).
       // Static seed: a new pattern every frame when sharp; with blur, patterns crossfade more slowly (24 a second down to 3).
-      candle: TRAIN && cfg.trTarget === 'candle' ? light : 0, candleMove: cfg.trFlame === 'still' ? 0 : 1,
+      candle: TRAIN && cfg.trTarget === 'candle' ? light * (1 - 0.6 * tdim) : 0, candleMove: cfg.trFlame === 'still' ? 0 : 1,
+      dis,
       stat: FIELD && cfg.fVisual === 'static' ? 1 : 0, blur: FIELD ? (cfg.fBlur || 0) / 100 : 0,
       seed: FIELD && cfg.fBlur > 0 ? (Math.max(0, t) * (24 - 21 * cfg.fBlur / 100)) % 997 : (frameNo = (frameNo + 1) % 997),
       rate: cfg.hzShow && t >= 0 && light > 0 ? { text: hz.toFixed(1) + ' Hz', a: clamp01(light * 2) } : null,
@@ -1982,9 +2187,75 @@ function createSession(mode, override) {
         return { on: eOn, flash: eFl, off: of };
       },
       sym,
-      dot: dotShown ? { rgb: dotRGB.map(v => v * dk), deg: cfg.dotSize } : null,
+      // In the Dojo's Gatekeeper the point briefly fades toward the background: that's the target to respond to.
+      dot: dotShown ? { rgb: dotRGB.map((v, i) => v * dk + (of[i] - v * dk) * 0.55 * tdim), deg: cfg.dotSize } : null,
       pattern: { full: 0, spiral: 1, rings: 2, tunnel: 3 }[cfg.pattern], ptime: t * cfg.pspeed
     };
+  };
+  // ---- Dojo sounds: synthesized, soft, placed in 3D around you ----
+  function setPos(p, w, at) { if (p.positionX) { p.positionX.setValueAtTime(w[0], at); p.positionY.setValueAtTime(w[1], at); p.positionZ.setValueAtTime(w[2], at); } else p.setPosition(w[0], w[1], w[2]); }
+  function djSound(e) {
+    const ctx = A.ctx; if (!ctx || !DJ) return;
+    if (e.type === 'drop') { A.dropUntil = S.t + 2.3; return; }
+    if (e.visual && e.type !== 'same' && e.type !== 'opposite') return;
+    if (!A.djOut) { A.djOut = ctx.createGain(); A.djOut.gain.value = [0.1, 0.17, 0.26, 0.38, 0.52][DJ.sal - 1]; A.djOut.connect(A.master); }
+    if (!A.noise) { const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; A.noise = b; }
+    const at = ctx.currentTime + 0.02;
+    const pan = (az, el, when = at) => { const p = ctx.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = 1; p.rolloffFactor = 0.5;
+      setPos(p, S.worldPoint(az, el, 3), when); p.connect(A.djOut); return p; };
+    const env = (g, t0, att, peak, dec) => { g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(peak, t0 + att); g.gain.exponentialRampToValueAtTime(0.0001, t0 + att + dec); };
+    const osc = (type, f, t0, dur, peak, out, att = 0.01) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; const g = ctx.createGain(); env(g, t0, att, peak, dur); o.connect(g).connect(out); o.start(t0); o.stop(t0 + att + dur + 0.05); };
+    const noise = (t0, dur, peak, out, ftype, f, q = 1) => { const s = ctx.createBufferSource(); s.buffer = A.noise; const fl = ctx.createBiquadFilter(); fl.type = ftype; fl.frequency.value = f; fl.Q.value = q;
+      const g = ctx.createGain(); env(g, t0, 0.005, peak, dur); s.connect(fl).connect(g).connect(out); s.start(t0, Math.random()); s.stop(t0 + dur + 0.1); return fl; };
+    const out = pan(e.az, e.el);
+    switch (e.type) {
+      case 'bell': { const f = 520 + 360 * e.base; [[1, 0.5], [2.76, 0.16], [5.4, 0.06]].forEach(([m, g]) => osc('sine', f * m, at, 2.4, g, out, 0.005)); break; }
+      case 'tone': osc('sine', 640 + 260 * e.base, at, 0.45, 0.45, out, 0.02); break;
+      case 'knock': [0, 0.22].forEach(d => { osc('sine', 380, at + d, 0.14, 0.5, out, 0.002); noise(at + d, 0.05, 0.35, out, 'bandpass', 1500, 2); }); break;
+      case 'steps': for (let i = 0; i < 4; i++) noise(at + i * 0.55, 0.18, 0.9, pan(e.az + Math.sign(e.az) * 0.08 * i, -0.3, at + i * 0.55), 'lowpass', 320, 0.7); break;
+      case 'wind': { const g = ctx.createGain();
+        const s = ctx.createBufferSource(); s.buffer = A.noise; s.loop = true; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+        bp.frequency.setValueAtTime(350, at); bp.frequency.linearRampToValueAtTime(900, at + 1.8); bp.frequency.linearRampToValueAtTime(450, at + 4);
+        g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.5, at + 1.6); g.gain.linearRampToValueAtTime(0.0001, at + 4);
+        s.connect(bp).connect(g).connect(out); s.start(at); s.stop(at + 4.1); break; }
+      case 'rhythm': for (let i = 0; i < 6; i++) noise(at + i * 0.3, 0.05, 0.45, out, 'bandpass', 2400, 3); break;
+      case 'melody': { const sc = [523, 587, 659, 784, 880]; for (let i = 0; i < 4; i++) osc('triangle', sc[Math.floor((e.base * 7 + i * 2.3) % 5)], at + i * 0.33, 0.3, 0.3, out, 0.02); break; }
+      case 'move': { const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 520; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, at);
+        g.gain.linearRampToValueAtTime(0.32, at + 0.4); g.gain.setValueAtTime(0.32, at + 3.0); g.gain.linearRampToValueAtTime(0.0001, at + 3.5);
+        o.connect(g).connect(out); o.start(at); o.stop(at + 3.6);
+        if (out.positionX) for (let i = 1; i <= 14; i++) { const w = S.worldPoint(e.az + Math.sign(e.az) * 1.6 * i / 14, e.el, 3), tt = at + 3.5 * i / 14;
+          out.positionX.linearRampToValueAtTime(w[0], tt); out.positionY.linearRampToValueAtTime(w[1], tt); out.positionZ.linearRampToValueAtTime(w[2], tt); }
+        break; }
+      case 'same': osc('sine', 700, at + 0.3, 0.6, 0.4, out, 0.03); break;
+      case 'opposite': osc('sine', 700, at + 0.3, 0.6, 0.4, pan(-e.az, e.el), 0.03); break;
+    }
+  }
+  // 3D sound follows your head in VR.
+  S.setListener = (pos, fwd, up) => {
+    const L = A.ctx && A.ctx.listener; if (!L || !DJ) return;
+    try {
+      if (L.positionX) { L.positionX.value = pos[0]; L.positionY.value = pos[1]; L.positionZ.value = pos[2];
+        L.forwardX.value = fwd[0]; L.forwardY.value = fwd[1]; L.forwardZ.value = fwd[2]; L.upX.value = up[0]; L.upY.value = up[1]; L.upZ.value = up[2]; }
+      else { L.setPosition(...pos); L.setOrientation(...fwd, ...up); }
+    } catch {}
+  };
+  // Results for the journal: counts, reaction times, and the event log for the replay strip.
+  S.dojoSummary = () => {
+    if (!DJ) return null;
+    const T = Math.max(0, Math.min(S.t, DJ.len));
+    if (DJ.away !== null) { DJ.awayT += T - DJ.away; DJ.log.push([T, 'b']); DJ.away = null; }
+    const out = { mode: DJ.gate ? 'gate' : 'temple', len: Math.round(T), blockLen: DJ.blockLen, distractions: DJ.ev.filter(e => e.t <= T).length,
+      away: S.anchored ? DJ.awayN : undefined, awaySecs: S.anchored ? Math.round(DJ.awayT) : undefined,
+      log: DJ.log.filter(l => l[0] <= T + 0.01).sort((a, b) => a[0] - b[0]).map(l => [Math.round(l[0] * 10) / 10, l[1]].concat(l.length > 2 ? [l[2]] : [])) };
+    if (DJ.gate) {
+      const due = DJ.targets.filter(x => x.hit || x.t + 1.5 <= T), hits = due.filter(x => x.hit);
+      const avg = a => a.length ? Math.round(1000 * a.reduce((s, x) => s + x.rt, 0) / a.length) : null;
+      const q = hits.filter(x => !x.dis), d = hits.filter(x => x.dis), dq = due.filter(x => !x.dis), dd = due.filter(x => x.dis);
+      Object.assign(out, { targets: due.length, hits: hits.length, misses: due.length - hits.length, fas: DJ.log.filter(l => l[1] === 'f' && l[0] <= T).length,
+        rt: avg(hits), rtQuiet: avg(q), rtDistract: avg(d), hitQuiet: dq.length ? Math.round(100 * q.length / dq.length) : null, hitDistract: dd.length ? Math.round(100 * d.length / dd.length) : null,
+        cost: q.length >= 3 && d.length >= 3 ? avg(d) - avg(q) : null });
+    } else out.reports = DJ.log.filter(l => l[1] === 'r' && l[0] <= T).length;
+    return out;
   };
   S.audio = A;   // exposed for testing
   S.stopAudio = () => {
@@ -2011,6 +2282,7 @@ uniform vec3 uDotCol; uniform float uDotR; uniform float uDotA;
 uniform vec3 uSymCol; uniform float uBreath; uniform float uGuide; uniform float uProg; uniform float uSide;
 uniform sampler2D uTxt; uniform float uTxtA;
 uniform float uStat; uniform float uSeed; uniform float uBlur; uniform float uCandle; uniform float uCandleMove;
+uniform vec4 uDis[4]; uniform vec4 uDisC[4];   // Dojo distractions: (x, y, radius, alpha) and (r, g, b, shape)
 const float TAU = 6.2831853;
 // Hash without sine (Dave Hoskins), stable on mobile GPUs: 0..1 per cell.
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -2122,6 +2394,16 @@ void main(){
     cand += vec3(1.0, 0.45, 0.1) * ember * 0.6;
     col += cand * uCandle;
   }
+  for (int i = 0; i < 4; i++) {
+    vec4 dd = uDis[i];
+    if (dd.w > 0.001) {
+      vec2 v = q - dd.xy; float r = length(v), sh = uDisC[i].w, m;
+      if (sh < 0.5) m = exp(-r * r / (dd.z * dd.z));                                            // soft glow
+      else if (sh < 1.5) m = exp(-pow((r - dd.z) / (dd.z * 0.16), 2.0));                       // ring
+      else m = exp(-r * r / 0.00006) + 0.35 * exp(-r * r / (dd.z * dd.z));                       // distant point of light
+      col = mix(col, uDisC[i].rgb, clamp(m * dd.w, 0.0, 1.0));
+    }
+  }
   if (uDotA > 0.5) {
     float d = length(gl_FragCoord.xy - uC);
     // On static, a small calm patch of even color around the dot keeps it easy to find among the grain.
@@ -2169,7 +2451,8 @@ function makeRenderer(gl) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
   const loc = n => gl.getUniformLocation(pr, n);
-  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide','uTxt','uTxtA','uStat','uSeed','uBlur','uCandle','uCandleMove'].map(n => [n, loc(n)]));
+  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide','uTxt','uTxtA','uStat','uSeed','uBlur','uCandle','uCandleMove','uDis','uDisC'].map(n => [n, loc(n)]));
+  const disA = new Float32Array(16), disB = new Float32Array(16);
   const aP = gl.getAttribLocation(pr, 'p');
   // Text texture for the rate readout: a dark pill with light text, so it reads on both the flash and the dark phase.
   let txTex = null, txText = '';
@@ -2205,6 +2488,12 @@ function makeRenderer(gl) {
       if (F.sym) { gl.uniform3fv(U.uSymCol, F.sym.col); gl.uniform1f(U.uBreath, F.sym.b); gl.uniform1f(U.uGuide, F.sym.g); gl.uniform1f(U.uProg, F.sym.prog ?? 1); gl.uniform1f(U.uSide, F.sym.side || 0); }
       else gl.uniform1f(U.uGuide, 0);
       gl.uniform1f(U.uStat, F.stat || 0); gl.uniform1f(U.uSeed, F.seed || 0); gl.uniform1f(U.uBlur, F.blur || 0); gl.uniform1f(U.uCandle, F.candle || 0); gl.uniform1f(U.uCandleMove, F.candleMove || 0);
+      disA.fill(0); disB.fill(0);
+      (F.dis || []).forEach((d, i) => {
+        const qq = F.disQ ? F.disQ[i] : [Math.tan(d.az), Math.tan(d.el)]; if (!qq || i > 3) return;
+        disA.set([qq[0], qq[1], d.r, d.a], i * 4); disB.set([d.rgb[0], d.rgb[1], d.rgb[2], d.shape], i * 4);
+      });
+      gl.uniform4fv(U.uDis, disA); gl.uniform4fv(U.uDisC, disB);
       if (F.rate) {
         setText(F.rate.text);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, txTex); gl.activeTexture(gl.TEXTURE0);
@@ -2242,6 +2531,9 @@ function startFS(override) {
   } catch (e) { stage.hidden = true; toast('This browser can\'t draw the flicker: ' + e.message); return; }
   running = true;
   const S = fsSession = createSession('fullscreen', override);
+  stage.querySelector('.hint').textContent = S.dojo
+    ? (S.dojo.gate ? 'Tap or press a key when the point fades · hold the screen or press Esc to stop' : 'Tap or press a key when you notice you drifted · hold the screen or press Esc to stop')
+    : 'Tap or press any key to stop';
   navigator.wakeLock?.request('screen').then(l => S.lock = l).catch(() => {});
   const meter = makeRefreshMeter();
   const loop = now => {
@@ -2264,8 +2556,16 @@ function stopFS(reason = 'stopped') {
   try { document.fullscreenElement && document.exitFullscreen(); } catch {}
   sessionEnded(S, reason);
 }
-stage.addEventListener('pointerdown', () => stopFS());
-window.addEventListener('keydown', () => fsSession && stopFS());
+// Tap or any key stops a session. In the Distraction Dojo, a tap or key is your response; hold the screen 1.5 s or press Esc to stop.
+let fsHold = null;
+stage.addEventListener('pointerdown', () => {
+  if (fsSession?.dojo) { fsSession.respond(); clearTimeout(fsHold); fsHold = setTimeout(() => stopFS(), 1500); } else stopFS();
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => stage.addEventListener(ev, () => clearTimeout(fsHold)));
+window.addEventListener('keydown', e => {
+  if (!fsSession) return;
+  if (fsSession.dojo && e.key !== 'Escape') { if (!e.repeat) fsSession.respond(); } else stopFS();
+});
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && fsSession) stopFS(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && fsSession) stopFS(); });
 $('#startFS').addEventListener('click', () => startFS());
@@ -2303,8 +2603,13 @@ async function startVR(override) {
   xrSession = session; running = true;
   let frames = 0, err = null, reason = 'stopped';
   const end = why => { if (why) reason = why; try { session.end(); } catch {} };
-  session.addEventListener('select', () => end('stopped'));
-  session.addEventListener('squeeze', () => end('stopped'));
+  // Any button stops a session, except in the Distraction Dojo: there the trigger is your response, and holding the grip for 1.5 s stops.
+  const buzz = src => { try { src?.gamepad?.hapticActuators?.[0]?.pulse?.(0.35, 25); } catch {} };
+  let holdTimer = null;
+  session.addEventListener('select', e => { if (S?.dojo) { if (S.respond()) buzz(e.inputSource); } else end('stopped'); });
+  session.addEventListener('squeeze', () => { if (!S?.dojo) end('stopped'); });
+  session.addEventListener('squeezestart', () => { if (S?.dojo) { clearTimeout(holdTimer); holdTimer = setTimeout(() => end('stopped'), 1500); } });
+  session.addEventListener('squeezeend', () => clearTimeout(holdTimer));
   session.addEventListener('end', () => {
     xrSession = null; running = false; S?.stopAudio();
     $('#xrNote').textContent = err
@@ -2330,8 +2635,9 @@ async function startVR(override) {
     R = makeRenderer(gl);
   } catch (e) { err = e.message; return end(); }
 
-  let viewerSpace = null;
+  let viewerSpace = null, localSpace = null;
   session.requestReferenceSpace('viewer').then(s => viewerSpace = s).catch(() => {});
+  session.requestReferenceSpace('local').then(s => localSpace = s).catch(() => {});   // the Dojo's anchor stays fixed in the room
   const meter = makeRefreshMeter();
   const mul = (m, v) => [0,1,2,3].map(i => m[i]*v[0] + m[4+i]*v[1] + m[8+i]*v[2] + m[12+i]*v[3]);
   const P = [0, 0, -2, 1];   // a point 2 m straight ahead: the center of patterns and the dot, so both eyes converge on it
@@ -2343,8 +2649,12 @@ async function startVR(override) {
       if (S.done) return end('finished');
       const layer = session.renderState.baseLayer;
       gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
-      const pose = viewerSpace && xrFrame.getViewerPose(viewerSpace);
-      if (pose) {
+      const lpose = S.dojo && localSpace && xrFrame.getViewerPose(localSpace);
+      const pose = !lpose && viewerSpace && xrFrame.getViewerPose(viewerSpace);
+      if (lpose) {
+        S.trackHead(lpose.transform.matrix);
+        lpose.views.forEach((view, i) => dojoDraw(R, F, S, view, layer.getViewport(view), view.eye === 'right' ? 1 : view.eye === 'left' ? 0 : i));
+      } else if (pose) {
         pose.views.forEach((view, i) => {
           const vp = layer.getViewport(view), pm = view.projectionMatrix;
           const c = mul(pm, mul(view.transform.inverse.matrix, P));
@@ -2386,6 +2696,7 @@ async function logEntry(S, reason) {
   if (secs < 5) return null;
   const entry = { id: S.startedAt.getTime(), date: S.startedAt.toISOString(), secs, planned: S.cfg.mins, mode: S.mode,
     reason: reason === 'finished' ? 'finished' : 'stopped early', cfg: S.cfg, refresh: S.refresh || null, rating: 0, note: '', voice: null };
+  if (S.dojo) entry.dojo = S.dojoSummary();
   await dbPut('sessions', entry);
   renderHistory();
   return entry;
@@ -2394,6 +2705,7 @@ function openJournal(entry) {
   journalEntry = entry; jRating = entry.rating || 0; jVoice = entry.voice || null; jTags = new Set(entry.tags || []);
   paintTags();
   $('#jSum').textContent = fmtDate(entry.date) + ' · ' + fmtDur(entry.secs) + ' · ' + describe(entry.cfg);
+  renderDojoResult($('#jDojo'), entry.dojo);
   $('#jText').value = entry.note || '';
   $('#jPlay').disabled = !jVoice;
   $('#jRecStatus').textContent = jVoice ? 'Voice note attached. Record again to replace it.' : 'Speak instead of typing, if you prefer.';
@@ -2463,6 +2775,7 @@ async function renderHistory() {
     const sum = document.createElement('p'); sum.className = 'entry-sum'; sum.textContent = describe(e.cfg);
     card.append(top, sum);
     if (e.rating) { const r = document.createElement('span'); r.className = 'rating'; r.textContent = '★'.repeat(e.rating) + '☆'.repeat(5 - e.rating); card.append(r); }
+    if (e.dojo) { const dj = document.createElement('p'); dj.className = 'entry-sum'; dj.textContent = dojoLine(e.dojo); card.append(dj); }
     if (e.tags?.length) { const tg = document.createElement('p'); tg.className = 'entry-sum'; tg.textContent = 'Saw: ' + e.tags.join(', '); card.append(tg); }
     if (e.note) { const n = document.createElement('p'); n.className = 'entry-note'; n.textContent = e.note; card.append(n); }
     const acts = document.createElement('div'); acts.className = 'entry-actions';
@@ -2663,27 +2976,33 @@ $('#fVR').addEventListener('click', () => startVR(fieldCfg()));
 // ================= Train: focused meditation exercises =================
 const EXERCISES = {
   stillpoint: { name: 'The Stillpoint', short: 'One still point of light in darkness. Keep your attention on it and gently return when you drift.',
-    about: 'Rest your attention on the single still point. When your mind wanders, notice it and gently come back. Each return is the exercise. Inspired by focused-attention meditation and trataka, the yogic practice of steady gazing.' }
+    about: 'Rest your attention on the single still point. When your mind wanders, notice it and gently come back. Each return is the exercise. Inspired by focused-attention meditation and trataka, the yogic practice of steady gazing.' },
+  dojo: { name: 'Distraction Dojo', short: 'Keep your attention on the point while sounds and lights come and go around you. Notice, let go, return.',
+    about: 'Keep your attention on the point while soft sounds and lights come and go around you. Notice them, let them go, and return. Temple is pure practice with no scores. Gatekeeper measures how well you catch the point fading while distractions compete for your attention.' }
 };
 const TRAIN_TARGETS = { white: 'White dot on black', black: 'Black dot on white', candle: 'Candle flame' };
-const TRAIN_DEFAULTS = { ex: 'stillpoint', flame: 'natural', target: 'white', size: 0.7, bright: 60, gaze: 10, bell: 0, after: false, sound: 'none', vol: 25, prepMin: 0 };
+const TRAIN_DEFAULTS = { ex: 'stillpoint', djMode: 'temple', djFreq: 2, djSal: 2, djRandom: true, flame: 'natural', target: 'white', size: 0.7, bright: 60, gaze: 10, bell: 0, after: false, sound: 'none', vol: 25, prepMin: 0 };
 const train = Object.assign({}, TRAIN_DEFAULTS, store.get('gf-train') || {});
 function trainCfg(tr = train) {
   const bg = tr.target === 'black' ? '#ffffff' : '#000000';
-  const mins = tr.gaze + (tr.after ? 1.5 : 0);
+  const dojo = tr.ex === 'dojo';
+  const mins = tr.gaze + (tr.after && !dojo ? 1.5 : 0);
   return { ...DEFAULTS, ...BASE, kind: 'train', hz: 10, flash: bg, off: bg, mins,
            bright: tr.target === 'black' ? Math.min(tr.bright, 70) : tr.bright,
            dot: tr.target !== 'candle', dotColor: tr.target === 'black' ? '#000000' : '#ffffff', dotSize: tr.size, dotMode: 'steady',
            breathOn: tr.prepMin > 0, breathPattern: 'res', breathRounds: Math.max(1, prepRounds(tr.prepMin)), breathSec: 4, breathVol: 35,
            bgOn: tr.sound !== 'none', bg: tr.sound === 'none' ? 'brown' : tr.sound, bgVol: tr.vol, bgSwell: false,
            iso: false, bin: false, drumOn: false, hzShow: false, ending: 'wake',
-           trEx: tr.ex, trFlame: tr.flame || 'natural', trTarget: tr.target, trSize: tr.size, trGaze: tr.gaze, trBell: tr.bell, trAfter: !!tr.after, trSound: tr.sound, trPrepMin: tr.prepMin, trBright: tr.bright };
+           trEx: tr.ex, trFlame: tr.flame || 'natural', trTarget: tr.target, trSize: tr.size, trGaze: tr.gaze, trBell: dojo ? 0 : tr.bell, trAfter: !dojo && !!tr.after,
+           djMode: tr.djMode || 'temple', djFreq: tr.djFreq || 2, djSal: tr.djSal || 2, djRandom: tr.djRandom !== false, trSound: tr.sound, trPrepMin: tr.prepMin, trBright: tr.bright };
 }
-const trainFromCfg = c => ({ ex: c.trEx || 'stillpoint', flame: c.trFlame || 'natural', target: c.trTarget || 'white', size: c.trSize || 0.7, bright: c.trBright || c.bright, gaze: c.trGaze || 10,
+const trainFromCfg = c => ({ ex: c.trEx || 'stillpoint', flame: c.trFlame || 'natural',
+  djMode: c.djMode || 'temple', djFreq: c.djFreq || 2, djSal: c.djSal || 2, djRandom: c.djRandom !== false, target: c.trTarget || 'white', size: c.trSize || 0.7, bright: c.trBright || c.bright, gaze: c.trGaze || 10,
   bell: c.trBell || 0, after: !!c.trAfter, sound: c.trSound || 'none', vol: c.bgVol || 25, prepMin: c.trPrepMin || 0 });
-const trainMinutes = (tr = train) => Math.round(prepRounds(tr.prepMin) * 11 / 60 + tr.gaze + (tr.after ? 1.5 : 0) + 0.1);
+const trainMinutes = (tr = train) => Math.round(prepRounds(tr.prepMin) * 11 / 60 + tr.gaze + (tr.after && tr.ex !== 'dojo' ? 1.5 : 0) + 0.1);
 function trainDescribe(c) {
   const tr = trainFromCfg(c);
+  if (tr.ex === 'dojo') return `Distraction Dojo · ${tr.djMode === 'gate' ? 'Gatekeeper' : 'Temple'} · ${TRAIN_TARGETS[tr.target].toLowerCase()} · ${tr.gaze} min · how often ${tr.djFreq}/5 · how noticeable ${tr.djSal}/5`;
   return `${EXERCISES[tr.ex].name} · ${TRAIN_TARGETS[tr.target].toLowerCase()} · ${tr.gaze} min` + (tr.bell ? ` · bell every ${tr.bell} min` : '') + (tr.after ? ' · afterimage' : '');
 }
 function renderTrainCards() {
@@ -2699,6 +3018,17 @@ function renderTrainCards() {
   });
 }
 function syncTrain() {
+  const dojo = train.ex === 'dojo';
+  $$('[data-ex]').forEach(el => el.hidden = el.dataset.ex !== train.ex);
+  $('#h-train').textContent = EXERCISES[train.ex].name;
+  $$('[data-djmode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.djmode === train.djMode));
+  $('#djModeNote').textContent = train.djMode === 'gate'
+    ? 'Gatekeeper: now and then the point briefly fades. Respond as soon as you see it. Stretches with and without distractions alternate, so the results show how much distractions slow you down.'
+    : 'Temple: pure practice, no scores during the session. Respond whenever you notice your attention has drifted, then return. Noticing is the skill.';
+  const words = ['', 'rarely', 'now and then', 'regularly', 'often', 'very often'], sw = ['', 'very subtle', 'subtle', 'moderate', 'clear', 'very clear'];
+  $('#djFreqOut').textContent = words[train.djFreq]; $('#djSalOut').textContent = sw[train.djSal];
+  $('#djControls').textContent = (train.djMode === 'gate' ? 'Respond when the point fades' : 'Respond when you notice you drifted')
+    + ': in VR pull the trigger; in fullscreen tap the screen or press a key. To stop: hold the grip for 2 seconds in VR, or hold the screen or press Esc in fullscreen.';
   $$('[data-trtarget]').forEach(b => b.setAttribute('aria-pressed', b.dataset.trtarget === train.target));
   $$('[data-trsize]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.trsize === +train.size));
   $$('[data-trbell]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.trbell === +train.bell));
@@ -2711,7 +3041,9 @@ function syncTrain() {
   $('#trTargetNote').textContent = { white: 'A small white point in darkness. The classic starting target.',
     black: 'A black point on a soft white field. Brightness is capped so the white stays comfortable.',
     candle: 'A candle flame glowing in the dark, the traditional trataka target. Rest your gaze on the brightest part of the flame, just above the wick.' }[train.target];
-  $('#trPlan').textContent = (train.prepMin > 0 ? `${train.prepMin} min slow breathing · ` : '') + `${train.gaze} min on the ${train.target === 'candle' ? 'flame' : 'point'}`
+  $('#trPlan').textContent = dojo ? (train.prepMin > 0 ? `${train.prepMin} min slow breathing · ` : '') + `${train.gaze} min in the ${train.djMode === 'gate' ? 'Gatekeeper' : 'Temple'}`
+      + (train.djMode === 'gate' ? `, alternating quiet and distracted stretches` : ', after 45 quiet seconds to settle') + ` · results at the end · about ${trainMinutes()} min`
+    : (train.prepMin > 0 ? `${train.prepMin} min slow breathing · ` : '') + `${train.gaze} min on the ${train.target === 'candle' ? 'flame' : 'point'}`
     + (train.bell ? ` · a soft bell every ${train.bell === 1 ? 'minute' : train.bell + ' min'}` : '') + (train.after ? ' · 90 s afterimage with eyes closed' : '') + ` · about ${trainMinutes()} min`;
   $('#trVR').disabled = !navigator.xr;
   renderTrainCards();
@@ -2722,6 +3054,7 @@ document.addEventListener('input', e => {
   store.set('gf-train', train); syncTrain();
 });
 document.addEventListener('click', e => {
+  const dm = e.target.closest('[data-djmode]'); if (dm) { train.djMode = dm.dataset.djmode; store.set('gf-train', train); syncTrain(); return; }
   const fl = e.target.closest('[data-trflame]'); if (fl) { train.flame = fl.dataset.trflame; store.set('gf-train', train); syncTrain(); return; }
   const t = e.target.closest('[data-trtarget]'), z = e.target.closest('[data-trsize]'), bl = e.target.closest('[data-trbell]'), s = e.target.closest('[data-trsound]');
   if (t) train.target = t.dataset.trtarget; else if (z) train.size = +z.dataset.trsize; else if (bl) train.bell = +bl.dataset.trbell; else if (s) train.sound = s.dataset.trsound; else return;
@@ -3144,15 +3477,19 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       text('TRAIN', 92, 120, `400 32px ${F.mono}`, C.accent);
       text(ex.name, 90, 220, `800 96px ${F.disp}`, C.fg);
       text(`~${trainMinutes(tr)} min · ${TRAIN_TARGETS[tr.target].toLowerCase()} · ${roomOf(roomId).name}`, 92, 290, `400 38px ${F.mono}`, C.muted);
-      const n = wrap(ex.about, 92, 370, 1840, 54, `400 40px ${F.body}`, C.fg, 5);
-      wrap(trainDescribe(trainCfg(tr)), 92, 380 + n * 54 + 24, 1840, 44, `400 32px ${F.mono}`, C.muted, 2);
-      // target choice right here, so you can switch without leaving the headset
+      const dj = tr.ex === 'dojo';
+      const n = wrap(ex.about, 92, 370, 1840, 54, `400 40px ${F.body}`, C.fg, dj ? 3 : 5);
+      wrap(trainDescribe(trainCfg(tr)), 92, 380 + n * 54 + 24, 1840, 44, `400 32px ${F.mono}`, C.muted, 1);
+      // mode and target choice right here, so you can switch without leaving the headset
+      if (dj) [['temple', 'Temple'], ['gate', 'Gatekeeper']].forEach(([k, label], i) =>
+        pill('djm-' + k, 92 + i * 520, 628, 500, 84, label, { selected: tr.djMode === k, size: 36 }, () => { tr.djMode = k; train.djMode = k; store.set('gf-train', train); }));
       Object.entries(TRAIN_TARGETS).forEach(([k, label], i) => {
         cx.font = `500 36px ${F.body}`;
-        pill('trt-' + k, 92 + i * 520, 690, 500, 84, label, { selected: tr.target === k, size: 36 }, () => { tr.target = k; train.target = k; store.set('gf-train', train); });
+        pill('trt-' + k, 92 + i * 520, dj ? 726 : 690, 500, 84, label, { selected: tr.target === k, size: 36 }, () => { tr.target = k; train.target = k; store.set('gf-train', train); });
       });
       rr(90, 830, 1860, 150, 24); cx.fillStyle = 'rgba(255,179,71,0.08)'; cx.fill(); cx.strokeStyle = 'rgba(255,179,71,0.5)'; cx.lineWidth = 3; cx.stroke();
-      wrap('Sit upright. Rest your gaze on the ' + (tr.target === 'candle' ? 'flame' : 'point') + ' and blink when you need to.' + (tr.after ? ' At the chime, close your eyes and hold the afterimage.' : '') + ' Pull the trigger at any time to stop.', 130, 890, 1780, 46, `400 36px ${F.body}`, C.warn, 2);
+      wrap(dj ? (tr.djMode === 'gate' ? 'Pull the trigger as soon as the point fades.' : 'Pull the trigger whenever you notice your attention drifted, then return.') + ' Hold the grip for 2 seconds to stop. The point stays where you face when it begins.'
+        : 'Sit upright. Rest your gaze on the ' + (tr.target === 'candle' ? 'flame' : 'point') + ' and blink when you need to.' + (tr.after ? ' At the chime, close your eyes and hold the afterimage.' : '') + ' Pull the trigger at any time to stop.', 130, 890, 1780, 46, `400 36px ${F.body}`, C.warn, 2);
       pill('back', 90, 1060, 300, 120, 'Back', { size: 44 }, () => { L.view = 'journeys'; panelDirty = true; });
       pill('begin', PW - 90 - 640, 1060, 640, 120, 'Begin', { primary: true, size: 54 }, () => begin());
     } else if (L.view === 'detail' && L.sel.field) {
@@ -3193,6 +3530,30 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       text('Get comfortable, then close your eyes when the light begins. Pull the trigger at any time to stop.', 130, 935, `400 36px ${F.body}`, C.warn);
       pill('back', 90, 1060, 300, 120, 'Back', { size: 44 }, () => { L.view = 'journeys'; panelDirty = true; });
       pill('begin', PW - 90 - 640, 1060, 640, 120, 'Begin', { primary: true, size: 54 }, () => begin());
+    } else if (L.view === 'results') {
+      const d = L.entry && L.entry.dojo;
+      text(d && d.mode === 'gate' ? 'Gatekeeper results' : 'Temple session', 90, 150, `800 88px ${F.disp}`, C.fg);
+      text(L.entry ? `${fmtDate(L.entry.date)} · ${fmtDur(L.entry.secs)}` : '', 92, 212, `400 34px ${F.mono}`, C.muted);
+      if (d) {
+        const st = dojoStats(d), colW = 900;
+        st.forEach(([k, v], i) => { const x = 92 + (i % 2) * colW, y = 300 + Math.floor(i / 2) * 64;
+          text(k, x, y, `400 34px ${F.body}`, C.muted); text(v, x + 330, y, `500 36px ${F.mono}`, C.fg); });
+        // replay strip
+        const y0 = 300 + Math.ceil(st.length / 2) * 64 + 10, x0 = 92, W = PW - 184, H = 200;
+        rr(x0, y0, W, H, 16); cx.fillStyle = 'rgba(255,255,255,0.04)'; cx.fill();
+        dojoMarks(d).forEach(m => {
+          const x = x0 + m.x * W; cx.fillStyle = cx.strokeStyle = DJ_MARK_COLOR[m.k];
+          if (m.k === 'block') cx.fillRect(x, y0, m.w * W, H);
+          else if (m.k === 'dis') { cx.lineWidth = 5; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(x, y0 + 16); cx.lineTo(x, y0 + 60); cx.stroke(); }
+          else if (m.k === 'target') { cx.lineWidth = 3; cx.beginPath(); cx.moveTo(x, y0 + 84); cx.lineTo(x, y0 + 128); cx.stroke(); }
+          else if (m.k === 'away') { rr(x, y0 + 152, Math.max(8, m.w * W), 26, 8); cx.fill(); }
+          else { cx.beginPath(); cx.arc(x, y0 + 106, 11, 0, 7); cx.fill(); }
+        });
+        const lg = [['dis', 'distraction'], ...(d.mode === 'gate' ? [['hit', 'caught'], ['miss', 'missed'], ['fa', 'false press']] : [['report', 'noticed drifting']]), ...(d.away !== undefined ? [['away', 'looked away']] : [])];
+        let lx = 92; lg.forEach(([k, t]) => { cx.fillStyle = DJ_MARK_COLOR[k]; cx.beginPath(); cx.arc(lx + 12, y0 + H + 42, 11, 0, 7); cx.fill(); text(t, lx + 34, y0 + H + 54, `400 32px ${F.body}`, C.muted); cx.font = `400 32px ${F.body}`; lx += cx.measureText(t).width + 80; });
+        wrap(DJ_NOTE[d.mode], 92, y0 + H + 120, PW - 184, 42, `400 32px ${F.body}`, C.muted, 2);
+      }
+      pill('rescont', PW - 90 - 480, 1080, 480, 110, 'Continue', { primary: true, size: 48 }, () => { L.view = 'rating'; panelDirty = true; });
     } else if (L.view === 'rating') {
       // After a session (or when editing from the journal): rating, quick tags and a voice note. No typing needed.
       const e = L.entry;
@@ -3241,7 +3602,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
         text(fmtDate(e.date), x + 34, y + 64, `500 44px ${F.body}`, C.fg);
         if (e.rating) text('★'.repeat(e.rating) + '☆'.repeat(5 - e.rating), x + 34 + tw, y + 64, `400 40px ${F.body}`, C.warn, 'right');
         ticker(`${fmtDur(e.secs)} · ${e.mode === 'vr' ? 'VR' : 'flat'} · ${describe(e.cfg)}`, x + 34, y + 116, tw, `400 30px ${F.mono}`, C.muted, false, 0);
-        const seen = [e.tags?.length ? 'Saw: ' + e.tags.join(', ') : '', e.note || ''].filter(Boolean).join(' — ');
+        const seen = [e.dojo ? dojoLine(e.dojo) : '', e.tags?.length ? 'Saw: ' + e.tags.join(', ') : '', e.note || ''].filter(Boolean).join(' — ');
         ticker(seen || (e.voice ? 'Voice note' : 'No notes'), x + 34, y + 176, tw, `400 34px ${F.body}`, seen ? C.fg : C.muted, false, 0);
         const bx = x + w - 34 - 200, by = y + (hh - 84) / 2;
         pill('juse' + i, bx, by, 200, 84, 'Use', { size: 38 }, () => useEntry(e));
@@ -3581,7 +3942,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     mode = 'fadein'; fade = 0; fadeTarget = 1; placed = false;   // re-center the panel where you are now looking
     const entry = await logEntry(done, reason);
     Object.assign(L, { entry, rating: 0, tags: new Set(), voice: null, recMsg: '', saved: false, back: 'journeys' });
-    L.view = entry && entry.secs >= 20 ? 'rating' : 'journeys';
+    L.view = entry && entry.dojo ? 'results' : entry && entry.secs >= 20 ? 'rating' : 'journeys';
     panelDirty = true;
   }
   async function saveRating() {
@@ -3593,12 +3954,15 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   function exit() { try { xr?.end(); } catch {} }
 
   function onSelect(e) {
-    if (mode === 'running') { finish('stopped'); return; }
+    if (mode === 'running') { if (S?.dojo) { if (S.respond()) pulse(e.inputSource, 0.35, 25); } else finish('stopped'); return; }
     if (mode !== 'menu' && mode !== 'fadein') return;
     const s = sources.get(e.inputSource); const b = s && s.hit && buttonAt(s.hit.px, s.hit.py);
     if (b) { pulse(e.inputSource, 0.6, 30); b.onClick(); panelDirty = true; }
   }
-  function onSqueeze() { if (mode === 'running') finish('stopped'); else placed = false; }
+  function onSqueeze() { if (mode === 'running') { if (!S?.dojo) finish('stopped'); } else placed = false; }
+  let holdTimer = null;   // in the Dojo, holding the grip for 1.5 s stops (the trigger is your response button)
+  function onSqueezeStart() { if (mode === 'running' && S?.dojo) { clearTimeout(holdTimer); holdTimer = setTimeout(() => finish('stopped'), 1500); } }
+  function onSqueezeEnd() { clearTimeout(holdTimer); }
   function pulse(src, v, ms) { try { src?.gamepad?.hapticActuators?.[0]?.pulse?.(v, ms); } catch {} }
 
   async function enter() {
@@ -3639,6 +4003,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     meter = makeRefreshMeter();
     xr.addEventListener('select', onSelect);
     xr.addEventListener('squeeze', onSqueeze);
+    xr.addEventListener('squeezestart', onSqueezeStart); xr.addEventListener('squeezeend', onSqueezeEnd);
     xr.addEventListener('inputsourceschange', () => sources.clear());
     xr.addEventListener('end', () => {
       if (amb) { amb.stop(); amb = null; }
@@ -3679,6 +4044,15 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     if (mode === 'running' && S) {
       const F = S.frame(now, xr.frameRate || meter(now));
       if (S.done) { finish('finished'); return; }
+      if (S.dojo) {   // Distraction Dojo: anchor fixed in the room where you faced at the start
+        S.trackHead(pose.transform.matrix);
+        pose.views.forEach((view, i) => {
+          const vp = layer.getViewport(view);
+          gl.disable(gl.BLEND); gl.disable(gl.DEPTH_TEST); gl.disable(gl.SCISSOR_TEST); noAttribs();
+          dojoDraw(G.flicker, F, S, view, vp, view.eye === 'right' ? 1 : view.eye === 'left' ? 0 : i);
+        });
+        return;
+      }
       const vpose = xf_.getViewerPose(viewerSpace);
       const P0 = [0, 0, -2, 1];
       (vpose ? vpose.views : pose.views).forEach((view, i) => {
