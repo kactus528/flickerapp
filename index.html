@@ -2015,6 +2015,14 @@ const float TAU = 6.2831853;
 // Hash without sine (Dave Hoskins), stable on mobile GPUs: 0..1 per cell.
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 vec2 seedOff(float s) { return vec2(s * 17.0, s * 59.0); }
+// One wax drip running down the candle's front from the rim: tapering trail with a rounded bead at its end. Returns 0..1.
+float drip(vec2 q, float top, float xi, float len, float w) {
+  float dy = top - q.y;                                         // distance below the rim
+  float wy = w * (0.75 + 0.25 * sin(dy * 260.0 + xi * 900.0)); // slightly uneven width
+  float trail = (1.0 - smoothstep(wy * 0.65, wy, abs(q.x - xi))) * step(0.0, dy) * (1.0 - smoothstep(len - 0.001, len, dy));
+  float bead = 1.0 - smoothstep(w * 1.05, w * 1.35, length(vec2(q.x - xi, (dy - len) * 1.15)));
+  return max(trail, bead);
+}
 // Smooth value noise: random values on a grid, blended with a smooth curve. Used for blurred static.
 float vnoise(vec2 p, float s) {
   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -2082,10 +2090,26 @@ void main(){
     vec3 glow = vec3(1.0, 0.55, 0.2) * (exp(-gr * gr / 0.0011) * 0.28 + exp(-gr / 0.085) * 0.055) * flick;
     // wax candle: rounded shading, lit from above, glowing softly through the wax near the top, with a melt pool rim
     float top = -0.0185, bx = abs(q.x) / 0.012;
-    float body = (1.0 - smoothstep(0.96, 1.0, bx)) * step(q.y, top) * step(top - 0.12, q.y);
-    float lit = 0.035 + 0.24 * exp((q.y - top) / 0.022) + 0.22 * exp((q.y - top) / 0.006) * (1.0 - bx);
-    vec3 bcol = vec3(0.96, 0.87, 0.72) * lit * (1.0 - 0.45 * bx * bx) * flick;
-    bcol += vec3(1.0, 0.75, 0.45) * exp(-pow((q.y - top) / 0.0011, 2.0)) * 0.12 * (1.0 - bx) * flick;
+    // melted rim: uneven, a little higher at the walls than in the middle where the pool has sunk
+    float rimY = top + 0.0011 * bx * bx + 0.00035 * sin(q.x * 1300.0 + 1.3) + 0.00025 * sin(q.x * 2900.0 + 0.4);
+    // drips over the sides bulge the outline, each ending in a bead
+    float dyT = top - q.y;
+    float halfL = 0.012 + 0.0014 * smoothstep(0.0, 0.004, dyT) * (1.0 - smoothstep(0.019, 0.023, dyT)) + 0.0008 * exp(-pow((dyT - 0.0215) / 0.0022, 2.0));
+    float halfR = 0.012 + 0.0011 * smoothstep(0.0, 0.004, dyT) * (1.0 - smoothstep(0.033, 0.037, dyT)) + 0.0007 * exp(-pow((dyT - 0.0355) / 0.002, 2.0));
+    float halfW = q.x < 0.0 ? halfL : halfR;
+    float body = (1.0 - smoothstep(halfW - 0.0004, halfW, abs(q.x))) * step(q.y, rimY) * step(top - 0.12, q.y);
+    // drips down the front face
+    float dr = max(max(drip(q, rimY, -0.0058, 0.027, 0.0017), drip(q, rimY, 0.0014, 0.016, 0.0014)), drip(q, rimY, 0.0068, 0.044, 0.0018));
+    float sideDrip = smoothstep(0.012, 0.0125, abs(q.x)) * step(q.y, top);   // the parts of side drips beyond the straight wall
+    dr = max(dr, sideDrip);
+    float lit = 0.035 + 0.24 * exp((q.y - top) / 0.022) + 0.22 * exp((q.y - top) / 0.006) * (1.0 - min(bx, 1.0));
+    vec3 bcol = vec3(0.96, 0.87, 0.72) * lit * (1.0 - 0.45 * min(bx * bx, 1.0)) * flick;
+    // drips are raised and glossy: a little brighter and warmer, with a soft highlight on the side facing the flame
+    bcol *= 1.0 + dr * 0.3;
+    bcol += vec3(1.0, 0.85, 0.6) * dr * lit * 0.28 * flick;
+    // a faint shadow just below each front drip's edge gives it some depth
+    bcol *= 1.0 - 0.18 * (max(max(drip(q + vec2(0.0, 0.0006), rimY, -0.0058, 0.027, 0.0017), drip(q + vec2(0.0, 0.0006), rimY, 0.0014, 0.016, 0.0014)), drip(q + vec2(0.0, 0.0006), rimY, 0.0068, 0.044, 0.0018)) - dr) * step(0.0, 1.0);
+    bcol += vec3(1.0, 0.75, 0.45) * exp(-pow((q.y - rimY) / 0.0011, 2.0)) * 0.14 * (1.0 - min(bx, 1.0)) * flick;   // lit rim of the melt pool
     // wick: slightly curved, dark, with a glowing tip inside the flame's base
     float wy = clamp((q.y - top) / 0.0055, 0.0, 1.0);
     float wx = q.x - 0.0011 * wy * wy - sway * 0.15;
