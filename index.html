@@ -1691,9 +1691,9 @@ function makeDojo(cfg) {
   const R = rng32((Date.now() ^ 0x5bd1e995) >>> 0), rr = (a, b) => a + (b - a) * R(), pick = a => a[Math.floor(R() * a.length)];
   const len = cfg.trGaze * 60, gate = cfg.djMode === 'gate', freq = cfg.djFreq || 2, sal = cfg.djSal || 2;
   // Gatekeeper alternates quiet and distracted blocks, so the same session measures both. Temple settles for 45 s first.
-  const blockLen = len >= 360 ? 90 : 60, settle = gate ? 0 : 45;
+  const blockLen = 60, settle = gate ? 0 : 30;
   const distractOn = t => t >= settle && (!gate || Math.floor(t / blockLen) % 2 === 1);
-  const mean = [40, 28, 18, 12, 8][freq - 1];
+  const mean = [24, 16, 11, 8, 5.5][freq - 1];
   const ev = []; let t = gate ? blockLen + rr(3, 8) : settle + rr(3, mean * 0.6), last = '';
   while (t < len - 6) {
     if (!distractOn(t)) { t = (Math.floor(t / blockLen) + 1) * blockLen + rr(2, 6); continue; }
@@ -1702,8 +1702,8 @@ function makeDojo(cfg) {
     if (type === 'drop' && !cfg.bgOn) type = 'tone';
     last = type;
     const visual = DJ_VISUAL.includes(type) || type === 'same' || type === 'opposite';
-    const side = R() < 0.5 ? -1 : 1, ecc = [46, 40, 33, 27, 22][sal - 1] * Math.PI / 180;
-    const az = visual ? side * rr(ecc, ecc + 0.14) : side * rr(0.5, 2.6);   // sounds can come from behind you
+    const side = R() < 0.5 ? -1 : 1, ecc = [32, 27, 23, 19, 15][sal - 1] * Math.PI / 180;   // the Quest's lenses blur much beyond ~30°
+    const az = visual ? side * rr(ecc, ecc + 0.12) : side * rr(0.5, 2.6);   // sounds can come from behind you
     const el = type === 'light' ? rr(-0.2, -0.1) : visual ? rr(-0.15, 0.18) : rr(-0.15, 0.35);
     const where = Math.abs(az) > 2.1 ? 'behind' : az < 0 ? 'left' : 'right';
     ev.push({ t, type, az, el, visual, dur: type === 'drift' ? 7 : type === 'wind' ? 4 : type === 'move' ? 3.5 : visual ? 4.5 : 2,
@@ -2149,15 +2149,15 @@ function createSession(mode, override) {
         if (!g.hit && !g.missed && t > g.t + 1.5) { g.missed = true; DJ.log.push([g.t + 1.5, 'm']); }
         if (t >= g.t && t < g.t + 0.6) tdim = Math.max(tdim, Math.min(1, (t - g.t) / 0.08, (g.t + 0.6 - t) / 0.08));
       }
-      const visA = [0.2, 0.28, 0.38, 0.5, 0.62][DJ.sal - 1];
+      const visA = [0.35, 0.48, 0.6, 0.72, 0.85][DJ.sal - 1];
       dis = [];
       for (const e of DJ.ev) {
         if (!e.visual || t < e.t || t > e.t + e.dur || dis.length >= 4) continue;
         const u = t - e.t, env = Math.min(1, u / 1.2, (e.dur - u) / 1.2), a = Math.max(0, env) * visA * light;
-        let az = e.az, el = e.el, col = DJ_COLORS[e.hue], shape = 0, r = 0.045;
+        let az = e.az, el = e.el, col = DJ_COLORS[e.hue], shape = 0, r = 0.065;
         if (e.type === 'drift') az = e.az - Math.sign(e.az) * 0.35 * (u / e.dur);
-        if (e.type === 'ring') { shape = 1; r = 0.05; }
-        if (e.type === 'light') { shape = 3; r = 0.05; }
+        if (e.type === 'ring') { shape = 1; r = 0.07; }
+        if (e.type === 'light') { shape = 3; r = 0.07; }
         if (e.type === 'shift') { const f = clamp01((u - e.dur * 0.4) / 0.8); col = col.map((v, i) => v + (DJ_COLORS[(e.hue2 + (e.hue2 === e.hue ? 1 : 0)) % 4][i] - v) * f); }
         dis.push({ az, el, r, a, rgb: col, shape });
       }
@@ -2198,10 +2198,10 @@ function createSession(mode, override) {
     const ctx = A.ctx; if (!ctx || !DJ) return;
     if (e.type === 'drop') { A.dropUntil = S.t + 2.3; return; }
     if (e.visual && e.type !== 'same' && e.type !== 'opposite') return;
-    if (!A.djOut) { A.djOut = ctx.createGain(); A.djOut.gain.value = [0.1, 0.17, 0.26, 0.38, 0.52][DJ.sal - 1]; A.djOut.connect(A.master); }
+    if (!A.djOut) { A.djOut = ctx.createGain(); A.djOut.gain.value = [0.35, 0.55, 0.75, 1.0, 1.3][DJ.sal - 1]; A.djOut.connect(A.master); }
     if (!A.noise) { const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; A.noise = b; }
     const at = ctx.currentTime + 0.02;
-    const pan = (az, el, when = at) => { const p = ctx.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = 1; p.rolloffFactor = 0.5;
+    const pan = (az, el, when = at) => { const p = ctx.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = 1; p.rolloffFactor = 0;   // direction only, no fading with distance
       setPos(p, S.worldPoint(az, el, 3), when); p.connect(A.djOut); return p; };
     const env = (g, t0, att, peak, dec) => { g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(peak, t0 + att); g.gain.exponentialRampToValueAtTime(0.0001, t0 + att + dec); };
     const osc = (type, f, t0, dur, peak, out, att = 0.01) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; const g = ctx.createGain(); env(g, t0, att, peak, dur); o.connect(g).connect(out); o.start(t0); o.stop(t0 + att + dur + 0.05); };
@@ -2209,19 +2209,19 @@ function createSession(mode, override) {
       const g = ctx.createGain(); env(g, t0, 0.005, peak, dur); s.connect(fl).connect(g).connect(out); s.start(t0, Math.random()); s.stop(t0 + dur + 0.1); return fl; };
     const out = pan(e.az, e.el);
     switch (e.type) {
-      case 'bell': { const f = 520 + 360 * e.base; [[1, 0.5], [2.76, 0.16], [5.4, 0.06]].forEach(([m, g]) => osc('sine', f * m, at, 2.4, g, out, 0.005)); break; }
-      case 'tone': osc('sine', 640 + 260 * e.base, at, 0.45, 0.45, out, 0.02); break;
-      case 'knock': [0, 0.22].forEach(d => { osc('sine', 380, at + d, 0.14, 0.5, out, 0.002); noise(at + d, 0.05, 0.35, out, 'bandpass', 1500, 2); }); break;
-      case 'steps': for (let i = 0; i < 4; i++) noise(at + i * 0.55, 0.18, 0.9, pan(e.az + Math.sign(e.az) * 0.08 * i, -0.3, at + i * 0.55), 'lowpass', 320, 0.7); break;
+      case 'bell': { const f = 520 + 360 * e.base; [[1, 0.22], [2.76, 0.07], [5.4, 0.026]].forEach(([m, g]) => osc('sine', f * m, at, 2.4, g, out, 0.005)); break; }
+      case 'tone': osc('sine', 640 + 260 * e.base, at, 0.45, 0.4, out, 0.02); break;
+      case 'knock': [0, 0.22].forEach(d => { osc('sine', 380, at + d, 0.14, 0.32, out, 0.002); noise(at + d, 0.05, 0.22, out, 'bandpass', 1500, 2); }); break;
+      case 'steps': for (let i = 0; i < 4; i++) noise(at + i * 0.55, 0.18, 1.45, pan(e.az + Math.sign(e.az) * 0.08 * i, -0.3, at + i * 0.55), 'lowpass', 320, 0.7); break;
       case 'wind': { const g = ctx.createGain();
         const s = ctx.createBufferSource(); s.buffer = A.noise; s.loop = true; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
         bp.frequency.setValueAtTime(350, at); bp.frequency.linearRampToValueAtTime(900, at + 1.8); bp.frequency.linearRampToValueAtTime(450, at + 4);
-        g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.5, at + 1.6); g.gain.linearRampToValueAtTime(0.0001, at + 4);
+        g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(1.7, at + 1.6); g.gain.linearRampToValueAtTime(0.0001, at + 4);
         s.connect(bp).connect(g).connect(out); s.start(at); s.stop(at + 4.1); break; }
-      case 'rhythm': for (let i = 0; i < 6; i++) noise(at + i * 0.3, 0.05, 0.45, out, 'bandpass', 2400, 3); break;
-      case 'melody': { const sc = [523, 587, 659, 784, 880]; for (let i = 0; i < 4; i++) osc('triangle', sc[Math.floor((e.base * 7 + i * 2.3) % 5)], at + i * 0.33, 0.3, 0.3, out, 0.02); break; }
+      case 'rhythm': for (let i = 0; i < 6; i++) noise(at + i * 0.3, 0.05, 1.45, out, 'bandpass', 2400, 3); break;
+      case 'melody': { const sc = [523, 587, 659, 784, 880]; for (let i = 0; i < 4; i++) osc('triangle', sc[Math.floor((e.base * 7 + i * 2.3) % 5)], at + i * 0.33, 0.3, 0.54, out, 0.02); break; }
       case 'move': { const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 520; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, at);
-        g.gain.linearRampToValueAtTime(0.32, at + 0.4); g.gain.setValueAtTime(0.32, at + 3.0); g.gain.linearRampToValueAtTime(0.0001, at + 3.5);
+        g.gain.linearRampToValueAtTime(0.47, at + 0.4); g.gain.setValueAtTime(0.47, at + 3.0); g.gain.linearRampToValueAtTime(0.0001, at + 3.5);
         o.connect(g).connect(out); o.start(at); o.stop(at + 3.6);
         if (out.positionX) for (let i = 1; i <= 14; i++) { const w = S.worldPoint(e.az + Math.sign(e.az) * 1.6 * i / 14, e.el, 3), tt = at + 3.5 * i / 14;
           out.positionX.linearRampToValueAtTime(w[0], tt); out.positionY.linearRampToValueAtTime(w[1], tt); out.positionZ.linearRampToValueAtTime(w[2], tt); }
@@ -2400,7 +2400,7 @@ void main(){
       vec2 v = q - dd.xy; float r = length(v), sh = uDisC[i].w, m;
       if (sh < 0.5) m = exp(-r * r / (dd.z * dd.z));                                            // soft glow
       else if (sh < 1.5) m = exp(-pow((r - dd.z) / (dd.z * 0.16), 2.0));                       // ring
-      else m = exp(-r * r / 0.00006) + 0.35 * exp(-r * r / (dd.z * dd.z));                       // distant point of light
+      else m = exp(-r * r / 0.00012) + 0.45 * exp(-r * r / (dd.z * dd.z));                       // distant point of light
       col = mix(col, uDisC[i].rgb, clamp(m * dd.w, 0.0, 1.0));
     }
   }
@@ -2981,8 +2981,9 @@ const EXERCISES = {
     about: 'Keep your attention on the point while soft sounds and lights come and go around you. Notice them, let them go, and return. Temple is pure practice with no scores. Gatekeeper measures how well you catch the point fading while distractions compete for your attention.' }
 };
 const TRAIN_TARGETS = { white: 'White dot on black', black: 'Black dot on white', candle: 'Candle flame' };
-const TRAIN_DEFAULTS = { ex: 'stillpoint', djMode: 'temple', djFreq: 2, djSal: 2, djRandom: true, flame: 'natural', target: 'white', size: 0.7, bright: 60, gaze: 10, bell: 0, after: false, sound: 'none', vol: 25, prepMin: 0 };
+const TRAIN_DEFAULTS = { ex: 'stillpoint', djMode: 'temple', djFreq: 3, djSal: 3, djRandom: true, flame: 'natural', target: 'white', size: 0.7, bright: 60, gaze: 10, bell: 0, after: false, sound: 'none', vol: 25, prepMin: 0 };
 const train = Object.assign({}, TRAIN_DEFAULTS, store.get('gf-train') || {});
+if (!train.djV2) { train.djFreq = Math.max(train.djFreq, 3); train.djSal = Math.max(train.djSal, 3); train.djV2 = true; }   // earlier defaults were too faint
 function trainCfg(tr = train) {
   const bg = tr.target === 'black' ? '#ffffff' : '#000000';
   const dojo = tr.ex === 'dojo';
@@ -3023,7 +3024,7 @@ function syncTrain() {
   $('#h-train').textContent = EXERCISES[train.ex].name;
   $$('[data-djmode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.djmode === train.djMode));
   $('#djModeNote').textContent = train.djMode === 'gate'
-    ? 'Gatekeeper: now and then the point briefly fades. Respond as soon as you see it. Stretches with and without distractions alternate, so the results show how much distractions slow you down.'
+    ? 'Gatekeeper: now and then the point briefly fades. Respond as soon as you see it. One-minute stretches alternate between quiet and distracted, starting quiet, so the results show how much distractions slow you down.'
     : 'Temple: pure practice, no scores during the session. Respond whenever you notice your attention has drifted, then return. Noticing is the skill.';
   const words = ['', 'rarely', 'now and then', 'regularly', 'often', 'very often'], sw = ['', 'very subtle', 'subtle', 'moderate', 'clear', 'very clear'];
   $('#djFreqOut').textContent = words[train.djFreq]; $('#djSalOut').textContent = sw[train.djSal];
@@ -3042,7 +3043,7 @@ function syncTrain() {
     black: 'A black point on a soft white field. Brightness is capped so the white stays comfortable.',
     candle: 'A candle flame glowing in the dark, the traditional trataka target. Rest your gaze on the brightest part of the flame, just above the wick.' }[train.target];
   $('#trPlan').textContent = dojo ? (train.prepMin > 0 ? `${train.prepMin} min slow breathing · ` : '') + `${train.gaze} min in the ${train.djMode === 'gate' ? 'Gatekeeper' : 'Temple'}`
-      + (train.djMode === 'gate' ? `, alternating quiet and distracted stretches` : ', after 45 quiet seconds to settle') + ` · results at the end · about ${trainMinutes()} min`
+      + (train.djMode === 'gate' ? `, alternating quiet and distracted stretches` : ', after 30 quiet seconds to settle') + ` · results at the end · about ${trainMinutes()} min`
     : (train.prepMin > 0 ? `${train.prepMin} min slow breathing · ` : '') + `${train.gaze} min on the ${train.target === 'candle' ? 'flame' : 'point'}`
     + (train.bell ? ` · a soft bell every ${train.bell === 1 ? 'minute' : train.bell + ' min'}` : '') + (train.after ? ' · 90 s afterimage with eyes closed' : '') + ` · about ${trainMinutes()} min`;
   $('#trVR').disabled = !navigator.xr;
