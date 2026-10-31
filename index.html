@@ -164,7 +164,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
 
 #stage { position: fixed; inset: 0; background: #000; z-index: 50; cursor: none; }
 #stage canvas { width: 100%; height: 100%; display: block; }
-#stage .hint { position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); text-align: center; font-family: var(--mono); font-size: 13px; color: #555; mix-blend-mode: difference; pointer-events: none; }
+#stage .hint { position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); text-align: center; font-family: var(--mono); font-size: 13px; color: #555; mix-blend-mode: difference; pointer-events: none; transition: opacity 0.6s; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem; z-index: 70; max-width: calc(100% - 32px); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -849,7 +849,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
       </div>
     </div>
     <p class="plan" id="fPlan"></p>
-    <p class="note">Sit or lie down. An even field can feel strange or disorienting, so stop whenever you want: pull the trigger in VR, or tap the screen in fullscreen.</p>
+    <p class="note">Sit or lie down. An even field can feel strange or disorienting, so stop whenever you want: pull the trigger in VR, or double-tap the screen in fullscreen.</p>
     <div class="foot">
       <button class="go secondary" id="fFS" type="button">Fullscreen</button>
       <button class="go" id="fVR" type="button">Start in VR</button>
@@ -941,7 +941,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
     </div>
     <p class="plan" id="trPlan"></p>
     <p class="note" data-ex="dojo" id="djControls"></p>
-    <p class="note">Sit upright and comfortable. Blink when you need to; there's no need to strain. Pull the trigger in VR, or tap the screen in fullscreen, to stop.</p>
+    <p class="note">Sit upright and comfortable. Blink when you need to; there's no need to strain. Pull the trigger in VR, or double-tap the screen in fullscreen, to stop.</p>
     <div class="foot">
       <button class="go secondary" id="trFS" type="button">Fullscreen</button>
       <button class="go" id="trVR" type="button">Start in VR</button>
@@ -2532,8 +2532,9 @@ function startFS(override) {
   running = true;
   const S = fsSession = createSession('fullscreen', override);
   stage.querySelector('.hint').textContent = S.dojo
-    ? (S.dojo.gate ? 'Tap or press a key when the point fades · hold the screen or press Esc to stop' : 'Tap or press a key when you notice you drifted · hold the screen or press Esc to stop')
-    : 'Tap or press any key to stop';
+    ? (S.dojo.gate ? 'Tap or press a key when the point fades · two-finger tap or Esc to stop' : 'Tap or press a key when you notice you drifted · two-finger tap or Esc to stop')
+    : 'Double-tap, tap with two fingers, or press any key to stop';
+  { const hint = stage.querySelector('.hint'); hint.style.opacity = '1'; clearTimeout(fsHintTimer); fsHintTimer = setTimeout(() => { hint.style.opacity = '0'; }, 6000); }
   navigator.wakeLock?.request('screen').then(l => S.lock = l).catch(() => {});
   const meter = makeRefreshMeter();
   const loop = now => {
@@ -2556,12 +2557,26 @@ function stopFS(reason = 'stopped') {
   try { document.fullscreenElement && document.exitFullscreen(); } catch {}
   sessionEnded(S, reason);
 }
-// Tap or any key stops a session. In the Distraction Dojo, a tap or key is your response; hold the screen 1.5 s or press Esc to stop.
-let fsHold = null;
-stage.addEventListener('pointerdown', () => {
-  if (fsSession?.dojo) { fsSession.respond(); clearTimeout(fsHold); fsHold = setTimeout(() => stopFS(), 1500); } else stopFS();
+// Stopping a fullscreen session takes a deliberate gesture, so a nose or cheek brushing the screen doesn't end it:
+// a double-tap or a two-finger tap (or a key). In the Distraction Dojo a single tap is your response, so only a
+// two-finger tap or Esc stops it.
+const fsTouches = new Set(); let fsLastTap = 0, fsHintTimer = null;
+function fsHint(msg) {
+  const el = stage.querySelector('.hint'); if (!el) return;
+  el.textContent = msg; el.style.opacity = '1'; clearTimeout(fsHintTimer);
+  fsHintTimer = setTimeout(() => { el.style.opacity = '0'; }, 2500);
+}
+stage.addEventListener('pointerdown', e => {
+  if (!fsSession) return;
+  fsTouches.add(e.pointerId);
+  if (fsTouches.size >= 2) { stopFS(); return; }   // two fingers: always stop
+  if (fsSession.dojo) { fsSession.respond(); return; }
+  const now = performance.now();
+  if (now - fsLastTap < 500) { fsLastTap = 0; stopFS(); return; }
+  fsLastTap = now;
+  fsHint('Double-tap or tap with two fingers to stop');
 });
-['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => stage.addEventListener(ev, () => clearTimeout(fsHold)));
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => stage.addEventListener(ev, e => fsTouches.delete(e.pointerId)));
 window.addEventListener('keydown', e => {
   if (!fsSession) return;
   if (fsSession.dojo && e.key !== 'Escape') { if (!e.repeat) fsSession.respond(); } else stopFS();
@@ -2857,7 +2872,7 @@ function syncJourney() {
   const ok = !info.intense || $('#hbAck').checked;
   $('#hbFS').disabled = !ok; $('#hbVR').disabled = !ok || !navigator.xr;
   $('#hbNote').textContent = !ok ? 'Tick the safety check to start.'
-    : (st === 'nadi' ? 'Press start and sit comfortably.' : 'Press start, then lie down and close your eyes.') + ' In VR, pull the trigger to stop; in fullscreen, tap the screen.';
+    : (st === 'nadi' ? 'Press start and sit comfortably.' : 'Press start, then lie down and close your eyes.') + ' In VR, pull the trigger to stop; in fullscreen, double-tap the screen.';
   renderBreathCards();
 }
 document.addEventListener('input', e => {
@@ -3029,7 +3044,7 @@ function syncTrain() {
   const words = ['', 'rarely', 'now and then', 'regularly', 'often', 'very often'], sw = ['', 'very subtle', 'subtle', 'moderate', 'clear', 'very clear'];
   $('#djFreqOut').textContent = words[train.djFreq]; $('#djSalOut').textContent = sw[train.djSal];
   $('#djControls').textContent = (train.djMode === 'gate' ? 'Respond when the point fades' : 'Respond when you notice you drifted')
-    + ': in VR pull the trigger; in fullscreen tap the screen or press a key. To stop: hold the grip for 2 seconds in VR, or hold the screen or press Esc in fullscreen.';
+    + ': in VR pull the trigger; in fullscreen tap the screen or press a key. To stop: hold the grip for 2 seconds in VR, or tap with two fingers or press Esc in fullscreen.';
   $$('[data-trtarget]').forEach(b => b.setAttribute('aria-pressed', b.dataset.trtarget === train.target));
   $$('[data-trsize]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.trsize === +train.size));
   $$('[data-trbell]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.trbell === +train.bell));
