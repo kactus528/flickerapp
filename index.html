@@ -439,6 +439,15 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
             <button class="chip" data-v="40">Gamma · 40 Hz</button>
           </div>
         </div>
+        <div class="row" id="gammaRows">
+          <span class="lbl">Gamma rate</span>
+          <div class="presets" data-key="hz" role="group" aria-label="Gamma rate">
+            <button class="chip" data-v="40">40 Hz</button>
+            <button class="chip" data-v="45">45 Hz</button>
+            <button class="chip" data-v="60">60 Hz</button>
+          </div>
+          <p class="note">Only rates a headset can show perfectly: 40 Hz (80 Hz screen, 1 frame on, 1 off; or 120 Hz, 2 on, 1 off), 45 Hz (90 Hz screen, 1 on, 1 off) and 60 Hz (120 Hz screen, 1 on, 1 off). In VR the headset switches to the matching screen rate by itself. Around 50–60 Hz most people stop seeing the flicker, though the brain still responds to it.</p>
+        </div>
       </div>
 
       <div class="sub" id="glideRows">
@@ -471,8 +480,9 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <div class="row">
           <span class="lbl">Headset refresh rate (VR)</span>
           <div class="presets" data-key="refresh" role="group" aria-label="Headset refresh rate">
-            <button class="chip" data-v="max">Highest available</button>
+            <button class="chip" data-v="max">Best for this rate</button>
             <button class="chip" data-v="72">72 Hz</button>
+            <button class="chip" data-v="80">80 Hz</button>
             <button class="chip" data-v="90">90 Hz</button>
             <button class="chip" data-v="120">120 Hz</button>
           </div>
@@ -1292,6 +1302,7 @@ function syncUI() {
     b.setAttribute('aria-pressed', state.gStart === s && state.gEnd === e && state.gMin === m);
   });
   show('#steadyRows', state.rhythm === 'steady');
+  show('#gammaRows', state.rhythm === 'steady' && state.hz >= 30);
   show('#glideRows', isJourney(state));
   { const gn = $('#glideNote'); if (gn) gn.textContent = state.rhythm === 'stairs'
       ? 'Five steady plateaus from start to end, each held for a fifth of this time, with a gentle 15-second step between them, then the end rate holds. Pace, then lead: time to settle at each step.'
@@ -1337,10 +1348,21 @@ function syncUI() {
 }
 // What the frame-locked rate becomes for a requested rate on a given refresh rate.
 const exact = (hz, refresh) => { const n = Math.max(2, Math.round(refresh / hz)); return { n, hz: refresh / n }; };
+// Which headset refresh rate to ask for. A rate picked by hand wins. Otherwise ('max', shown as "Best for this rate"):
+// for gamma, the screen rate that shows the requested rate exactly, preferring equal on/off frames (an even number of
+// frames per flash), then the faster screen; for everything else, the fastest screen.
+function pickRefresh(rates, cfg) {
+  if (!rates.length) return null;
+  if (cfg.refresh !== 'max' && rates.includes(+cfg.refresh)) return +cfg.refresh;
+  const hz = cfg.hz, top = Math.max(...rates);
+  if (!(hz >= 30) || isJourney(cfg)) return top;
+  const score = r => { const e = exact(hz, r), miss = Math.abs(e.hz - hz); return (miss < 0.01 ? 1000 : -miss * (e.hz < hz ? 200 : 100)) + (e.n % 2 === 0 ? 100 : 0) + r / 1000; };
+  return rates.slice().sort((a, b) => score(b) - score(a))[0];
+}
 const fmtHz = v => (Math.abs(v - Math.round(v)) < 0.005 ? Math.round(v) : v.toFixed(2)) + ' Hz';
 function lockHint() {
   if (state.drift) return 'With drift on, the rate steps between nearby exact rates instead of sliding smoothly.';
-  const rates = state.refresh === 'max' ? [72, 90, 120] : [+state.refresh];
+  const rates = state.refresh === 'max' ? [72, 80, 90, 120] : [+state.refresh];
   if (isJourney(state)) {
     const r = rates[rates.length - 1];
     const steps = []; let last = 0;
@@ -1348,7 +1370,7 @@ function lockHint() {
     return `The journey steps through the exact rates on the way. At ${r} Hz those are ${steps.join(', ')}.`;
   }
   const parts = rates.map(r => { const e = exact(state.hz, r); return `${r} Hz screen → ${fmtHz(e.hz)} (${e.n} frames per flash)`; });
-  return `${fmtHz(state.hz)} becomes: ${parts.join(' · ')}. In VR the page uses ${state.refresh === 'max' ? 'the highest rate the headset offers' : 'the rate you picked'}; fullscreen uses whatever the screen runs at.`;
+  return `${fmtHz(state.hz)} becomes: ${parts.join(' · ')}. In VR the page uses ${state.refresh === 'max' ? (state.hz >= 30 && !isJourney(state) ? `the screen rate that fits best (${pickRefresh([72, 80, 90, 120], state)} Hz on a Quest)` : 'the highest rate the headset offers') : 'the rate you picked'}; fullscreen uses whatever the screen runs at.`;
 }
 function changed() {
   syncUI(); store.set('gf-last', state);
@@ -2220,9 +2242,9 @@ function createSession(mode, override) {
       const u = clamp01((t - (total - W)) / W);
       hz += (12 - hz) * u;
     }
-    // Normal range tops out at 16 Hz. The one exception is a steady gamma setting near 40 Hz (chosen as a preset, never
+    // Normal range tops out at 16 Hz. The one exception is a steady gamma setting of 40-60 Hz (chosen as a preset, never
     // reached by sliding), so the 16-30 Hz band, where flicker is most likely to provoke seizures, stays out of reach.
-    return Math.max(3, Math.min(cfg.hz >= 30 && cfg.rhythm === 'steady' ? 45 : 16, hz));
+    return Math.max(3, Math.min(cfg.hz >= 30 && cfg.rhythm === 'steady' ? 60 : 16, hz));
   }
   function flashAt(t) {
     if (!cfg.cj) return flashRGB;
@@ -2988,7 +3010,7 @@ async function startVR(override) {
   try {
     const rates = [...(session.supportedFrameRates || [])];
     if (rates.length) {
-      const want = S.cfg.refresh === 'max' || !rates.includes(+S.cfg.refresh) ? Math.max(...rates) : +S.cfg.refresh;
+      const want = pickRefresh(rates, S.cfg);
       session.updateTargetFrameRate(want).then(() => noteVRRates(rates, session.frameRate)).catch(e => noteVRRates(rates, session.frameRate, e));
     } else noteVRRates([], session.frameRate);
   } catch {}
@@ -4286,6 +4308,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     if (savedFov !== null) { try { xr.renderState.baseLayer.fixedFoveation = savedFov; } catch {} savedFov = null; }
     done.stopAudio();
     mode = 'fadein'; fade = 0; fadeTarget = 1; placed = false;   // re-center the panel where you are now looking
+    try { const rates = [...(xr.supportedFrameRates || [])]; if (rates.length && xr.frameRate !== Math.max(...rates)) xr.updateTargetFrameRate(Math.max(...rates)).catch(() => {}); } catch {}   // lobby back to the fastest screen
     const entry = await logEntry(done, reason);
     Object.assign(L, { entry, rating: 0, tags: new Set(), voice: null, recMsg: '', saved: false, back: 'journeys' });
     L.view = entry && entry.dojo ? 'results' : entry && entry.secs >= 20 ? 'rating' : 'journeys';
@@ -4378,6 +4401,8 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     fade += Math.sign(fadeTarget - fade) * Math.min(Math.abs(fadeTarget - fade), dt * speed);
     if (mode === 'fadeout' && fade <= 0.001) {
       S = createSession('vr', L.override); mode = 'running';
+      try { const rates = [...(xr.supportedFrameRates || [])], want = pickRefresh(rates, S.cfg);   // screen rate that fits this session
+        if (want && want !== xr.frameRate) xr.updateTargetFrameRate(want).then(() => noteVRRates(rates, xr.frameRate)).catch(() => {}); } catch {}
       // Fine TV static needs full resolution at the edges of the view too (see fixed foveation in the direct VR start).
       if (S.cfg.fVisual === 'static') { try { const ly = xr.renderState.baseLayer; savedFov = ly.fixedFoveation; ly.fixedFoveation = 0; } catch {} }
     }
