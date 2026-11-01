@@ -399,6 +399,8 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <p class="note" id="lockHint"></p>
       </div>
 
+      <label class="toggle"><input type="checkbox" data-key="spectrum"> Rainbow steps (each flash is the next color: red, orange, yellow, green, blue, indigo, violet)</label>
+      <p class="note" id="spectrumNote" hidden>Fast changes between saturated colors can trigger seizures in people who are sensitive, even more than plain flicker. It unlocks after you finish another flicker journey of at least 5 minutes and confirm flicker hasn't caused you any problems.</p>
       <label class="toggle"><input type="checkbox" data-key="cj"> Color journey (flash color slowly drifts through a palette)</label>
       <div class="sub" id="cjRows">
         <div class="presets" data-key="palette" role="group" aria-label="Palette" id="palettes"></div>
@@ -1009,6 +1011,19 @@ const $$ = s => [...document.querySelectorAll(s)];
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const hexRGB = h => [1,3,5].map(i => parseInt(h.slice(i, i+2), 16) / 255);
 const isJourney = c => c.rhythm === 'glide' || c.rhythm === 'stairs';
+// Rainbow steps gate: only after a completed flicker journey (5+ min) and a one-time confirmation of no problems.
+let spectrumEligible = false;
+const spectrumOK = () => spectrumEligible && !!store.get('gf-spectrum-ok');
+const SPECTRUM_LOCKED = 'Rainbow steps unlock after you finish another flicker journey of at least 5 minutes with no problems.';
+function askSpectrum() {   // flat app only (uses a browser dialog); VR has its own confirm button
+  if (!spectrumEligible) { toast(SPECTRUM_LOCKED); return false; }
+  if (!store.get('gf-spectrum-ok')) {
+    if (!confirm('Rapid changes between saturated colors carry extra seizure risk, more than plain flicker.\n\nHave your earlier flicker sessions gone without any seizure, fainting, twitching, strange sensations or other unusual reaction?')) return false;
+    store.set('gf-spectrum-ok', Date.now());
+  }
+  return true;
+}
+const SPECTRUM = ['#ff2a1a', '#ff8a1a', '#ffdc1a', '#2edc5a', '#2a6bff', '#4b2aff', '#a03aff'].map(hexRGB);   // ROYGBIV
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
@@ -1025,7 +1040,7 @@ const DEFAULTS = {
   flash: '#ffffff', off: '#000000', bright: 70,
   pattern: 'full', pspeed: 1, split: 'both', splitColor: '#3366ff',
   dot: false, dotSize: 0.3, dotColor: '#000000', dotMode: 'steady',
-  iso: false, bin: false, mono: false, pitch: 200, toneVol: 40,
+  iso: false, bin: false, mono: false, pitch: 200, toneVol: 40, spectrum: false,
   bgOn: false, bg: 'rain', bgVol: 30, bgSwell: true, bgSwellSec: 10,
   drumOn: false, drumRate: 4.5, drumSync: false, drumVol: 60,
   affOn: false, affWhen: 'whole', affFade: false, affGap: 6, affVol: 80,
@@ -1125,7 +1140,8 @@ function describe(c, withBreath = true) {
   parts.push(c.rhythm === 'stairs' ? `${c.gStart}→${c.gEnd} Hz in 5 steps over ${c.gMin} min` : c.rhythm === 'glide' ? `${c.gStart}→${c.gEnd} Hz over ${c.gMin} min` : `${c.hz} Hz`);
   if (c.drift) parts.push('drift');
   if (c.lock) parts.push('frame-locked');
-  parts.push(c.cj ? (PALETTES[c.palette]?.name || 'Color') + ' journey' : colorName(c.flash));
+  if (!c.spectrum) parts.push(c.cj ? (PALETTES[c.palette]?.name || 'Color') + ' journey' : colorName(c.flash));
+  if (c.spectrum) parts.push('rainbow steps');
   if (c.pattern !== 'full') parts.push({ spiral: 'spiral', rings: 'radial pulse', tunnel: 'tunnel' }[c.pattern]);
   if (c.split === 'alt') parts.push('alternate eyes'); else if (c.split === 'colors') parts.push('two-color eyes');
   if (c.iso) parts.push('isochronic');
@@ -1178,6 +1194,7 @@ function syncUI() {
   show('#splitColorRow', state.split === 'colors');
   show('#dotRows', state.dot);
   show('#toneRows', state.iso || state.bin || state.mono);
+  show('#spectrumNote', state.spectrum);
   show('#lockRows', state.lock);
   show('#breathRows', state.breathOn);
   show('#b_breathRows', state.breathOn);
@@ -1302,6 +1319,7 @@ const EXTRAS = [
   ['rhythm', v => v === 'glide' || v === 'stairs', 'a journey (changing rate)', { rhythm: 'steady' }],
   ['drift', v => v, 'drift', { drift: false }],
   ['cj', v => v, 'a color journey', { cj: false }],
+  ['spectrum', v => v, 'rainbow steps', { spectrum: false }],
   ['off', v => v !== '#000000', 'a between-flash color', { off: '#000000' }],
   ['pattern', v => v !== 'full', 'a pattern', { pattern: 'full' }],
   ['split', v => v !== 'both', 'a split-eye mode', { split: 'both' }],
@@ -1350,6 +1368,7 @@ $('#agree').addEventListener('click', () => { if (consent.checked) { backStack.l
 
 // ================= Presets =================
 function loadCfg(cfg, label) {
+  if (cfg.spectrum && !askSpectrum()) return;
   if (cfg.kind === 'field') { Object.assign(field, fieldFromCfg(cfg)); store.set('gf-field', field); syncField(); go('field'); return; }
   if (cfg.kind === 'train') { Object.assign(train, trainFromCfg(cfg)); store.set('gf-train', train); syncTrain(); go('train'); return; }
   if (STYLE_OF[cfg.kind]) {
@@ -1389,6 +1408,9 @@ const RESEARCH = [
   { name: 'Drum-locked journey', time: '~22 min',
     why: 'Steady drumming helped experienced practitioners turn inward in brain-scan research. Here the drum strikes on every second flash (5 beats a second at 10 Hz), so sound and light share one rhythm.',
     cfg: { ...BASE, hz: 10, flash: '#ff991a', bright: 60, mins: 20, breathOn: true, breathRounds: 6, breathSec: 4, breathVol: 40, bgOn: true, bg: 'brown', bgVol: 20, drumOn: true, drumRate: 5, drumSync: true, drumVol: 55 } },
+  { name: 'Spectrum', time: '~17 min', caution: true,
+    why: 'Each flash is the next color of the rainbow: red, orange, yellow, green, blue, indigo, violet. At 7 Hz that is one full trip through the spectrum every second. Fast changes between saturated colors carry extra seizure risk, so this journey unlocks only after you have finished another flicker journey and confirmed it caused you no problems.',
+    cfg: { ...BASE, hz: 7, spectrum: true, flash: '#ffffff', bright: 50, mins: 15, breathOn: true, breathRounds: 5, breathSec: 4, breathVol: 40, bgOn: true, bg: 'brown', bgVol: 30 } },
   { name: 'Classic Ganzflicker', time: '~12 min', caution: true,
     why: 'The red-and-black flicker at 7.5 Hz used in the large online Ganzflicker studies, with white noise. Red reaches through eyelids best, but saturated red flicker carries extra seizure risk, so brightness is kept moderate.',
     cfg: { ...BASE, hz: 7.5, flash: '#ff1408', bright: 50, mins: 12, breathOn: false, bgOn: true, bg: 'white', bgVol: 30 } }
@@ -2110,6 +2132,7 @@ function createSession(mode, override) {
       on = phase < 0.5;
     }
     // Frequency following: tell the tone processor exactly when this flash will be on screen, in audio-clock time.
+    if (on && !S.prevOn && t >= 0) S.flashN = (S.flashN || 0) + 1;   // flash counter (rainbow steps)
     if (on && !S.prevOn && A.follow && t >= 0) {
       try {
         const ts = A.ctx.getOutputTimestamp ? A.ctx.getOutputTimestamp() : null, shown = nowMs + 1000 / (refresh || 60);
@@ -2270,7 +2293,8 @@ function createSession(mode, override) {
     // Breath guide: the sun symbol (a ring with a center dot) drawn by the renderer; no full-field glow.
     const symK = Math.max(cfg.bright / 100, 0.55);
     const sym = guide > 0.001 ? { col: flashAt(0).map(v => v * symK), b: bshape, g: guide, prog, side } : null;
-    const fl = flashAt(Math.max(0, t)).map(v => v * k), of = offRGB.map(v => v * k);
+    // Rainbow steps: each new flash takes the next color of the spectrum, at full saturation.
+    const fl = (cfg.spectrum ? SPECTRUM[((S.flashN || 1) - 1) % 7] : flashAt(Math.max(0, t))).map(v => v * k), of = offRGB.map(v => v * k);
     const dotShown = cfg.dot && light > 0.002 && (cfg.dotMode === 'steady' || (cfg.dotMode === 'with') === on);
     const dk = Math.max(cfg.bright / 100, 0.3) * Math.max(light, 0.3);
     return {
@@ -2627,6 +2651,7 @@ const stage = $('#stage'), fsCanvas = $('#fsCanvas');
 let fsGL = null, fsR = null, raf = 0, fsSession = null, running = false, xrSession = null;
 function startFS(override) {
   if (running) return;
+  if ((override || state).spectrum && !spectrumOK()) { toast(SPECTRUM_LOCKED); return; }
   try { stage.requestFullscreen?.().catch(() => {}); } catch {}
   stage.hidden = false;
   try {
@@ -2703,6 +2728,7 @@ $('#startFS').addEventListener('click', () => startFS());
 $('#startVR').addEventListener('click', () => startVR());
 async function startVR(override) {
   if (running) return;
+  if ((override || state).spectrum && !spectrumOK()) { toast(SPECTRUM_LOCKED); return; }
   // Ask for VR first thing in the tap, before any other work, so the headset counts it as a direct tap.
   let request;
   try { request = navigator.xr.requestSession('immersive-vr'); } catch (e) { request = Promise.reject(e); }
@@ -2859,6 +2885,7 @@ $('#showAll').addEventListener('click', () => { showAll = true; renderHistory();
 
 async function renderHistory() {
   const all = (await dbAll('sessions')).sort((a, b) => b.id - a.id);
+  spectrumEligible = all.some(e => e.cfg && !e.cfg.kind && !e.cfg.spectrum && e.secs >= 300);
   const box = $('#entries'); box.innerHTML = '';
   const totalMin = Math.round(all.reduce((s, e) => s + e.secs, 0) / 60);
   const rated = all.filter(e => e.rating);
@@ -3180,6 +3207,7 @@ document.addEventListener('click', e => {
   store.set('gf-train', train); syncTrain();
 });
 $('#trFS').addEventListener('click', () => startFS(trainCfg()));
+document.addEventListener('change', e => { if (e.target.dataset?.key === 'spectrum' && e.target.checked && !askSpectrum()) { state.spectrum = false; changed(); } });
 $('#trVR').addEventListener('click', () => startVR(trainCfg()));
 
 // Home: Flicker, Breath, Field and Train tabs
@@ -3221,7 +3249,8 @@ const Lobby = (() => {
     'Drum-locked journey': 'A drum beats in time with the light.',
     'Frequency following': 'Light and beats step down 12 → 4.5 Hz together.',
     'Gamma 40': 'A fast 40 Hz shimmer with locked pulses.',
-    'Classic Ganzflicker': 'Red flicker from the online studies.'
+    'Classic Ganzflicker': 'Red flicker from the online studies.',
+    'Spectrum': 'Each flash is the next color of the rainbow.'
   };
   let roomId = (() => { try { return localStorage.getItem('gf-room') || 'night'; } catch { return 'night'; } })();
   const roomOf = id => ROOMS.find(r => r.id === id) || ROOMS[0];
@@ -3569,15 +3598,17 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
         pill('tab-' + k, tx0 + i * (TW + TG), 82, TW, 96, label, { selected: L.tab === k, size: 40 }, () => { L.tab = k; try { localStorage.setItem('gf-lobbytab', k); } catch {} panelDirty = true; }));
       pill('journal', tx0 - 30 - 210, 82, 210, 96, 'Journal', { size: 40 }, () => openVRJournal());
       text('Point and pull the trigger to choose · squeeze the grip to bring this panel in front of you', 92, 212, `400 36px ${F.body}`, C.muted);
-      const items = journeys(), cols = 3, gx = 30, cw = (PW - 180 - gx * (cols - 1)) / cols, ch = 214;
+      // Cards get more compact when there are four rows, so they always clear the room bar at the bottom.
+      const items = journeys(), cols = 3, gx = 30, cw = (PW - 180 - gx * (cols - 1)) / cols, tight = Math.ceil(items.length / cols) > 3;
+      const ch = tight ? 182 : 214, gy = tight ? 16 : 26, o1 = tight ? 58 : 68, o2 = tight ? 102 : 116, o3 = tight ? 148 : 166;
       items.forEach((it, i) => {
-        const x = 90 + (i % cols) * (cw + gx), y = 262 + Math.floor(i / cols) * (ch + 26);
+        const x = 90 + (i % cols) * (cw + gx), y = 262 + Math.floor(i / cols) * (ch + gy);
         button('j' + i, x, y, cw, ch, hi => {
           rr(x, y, cw, ch, 28); cx.fillStyle = hi ? C.cardHi : C.card; cx.fill();
           cx.lineWidth = 3; cx.strokeStyle = hi ? C.accent : C.line; cx.stroke();
-          text(it.name, x + 34, y + 68, `500 46px ${F.body}`, C.fg);
-          text(it.breath ? `breath only · ~${styleMinutes(it.breath)} min` : it.field ? `no flicker · ~${fieldMinutes(it.field)} min` : it.train ? `focus · ~${trainMinutes(it.train)} min` : metaOf(it.cfg), x + 34, y + 116, `400 32px ${F.mono}`, C.muted);
-          ticker(it.short, x + 34, y + 166, cw - 68, `400 33px ${F.body}`, it.caution ? C.warn : hi ? C.fg : C.muted, hi, hoverSince.get('j' + i) || 0);
+          text(it.name, x + 34, y + o1, `500 46px ${F.body}`, C.fg);
+          text(it.breath ? `breath only · ~${styleMinutes(it.breath)} min` : it.field ? `no flicker · ~${fieldMinutes(it.field)} min` : it.train ? `focus · ~${trainMinutes(it.train)} min` : metaOf(it.cfg), x + 34, y + o2, `400 32px ${F.mono}`, C.muted);
+          ticker(it.short, x + 34, y + o3, cw - 68, `400 33px ${F.body}`, it.caution ? C.warn : hi ? C.fg : C.muted, hi, hoverSince.get('j' + i) || 0);
         }, () => { L.sel = it; L.view = 'detail'; panelDirty = true; });
       });
       // room chooser + exit
@@ -3648,9 +3679,14 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       const n = wrap(why || '', 92, 380, 1500, 60, `400 44px ${F.body}`, C.fg, 5);
       wrap(describe(cfg), 92, 400 + n * 60 + 30, 1500, 46, `400 32px ${F.mono}`, C.muted, 3);
       rr(90, 860, 1860, 120, 24); cx.fillStyle = 'rgba(255,179,71,0.08)'; cx.fill(); cx.strokeStyle = 'rgba(255,179,71,0.5)'; cx.lineWidth = 3; cx.stroke();
-      text('Get comfortable, then close your eyes when the light begins. Pull the trigger at any time to stop.', 130, 935, `400 36px ${F.body}`, C.warn);
+      const spLock = cfg.spectrum && !spectrumOK();
+      if (spLock && !spectrumEligible) text(SPECTRUM_LOCKED, 130, 935, `400 36px ${F.body}`, C.warn);
+      else if (spLock) {
+        text('Fast color changes carry extra seizure risk. Have earlier flicker sessions gone with no problems?', 130, 935, `400 34px ${F.body}`, C.warn);
+        pill('spok', PW - 90 - 640 - 30 - 560, 1060, 560, 120, 'Yes, no problems', { size: 44 }, () => { store.set('gf-spectrum-ok', Date.now()); });
+      } else text('Get comfortable, then close your eyes when the light begins. Pull the trigger at any time to stop.', 130, 935, `400 36px ${F.body}`, C.warn);
       pill('back', 90, 1060, 300, 120, 'Back', { size: 44 }, () => { L.view = 'journeys'; panelDirty = true; });
-      pill('begin', PW - 90 - 640, 1060, 640, 120, 'Begin', { primary: true, size: 54 }, () => begin());
+      pill('begin', PW - 90 - 640, 1060, 640, 120, 'Begin', { primary: true, disabled: spLock, size: 54 }, () => begin());
     } else if (L.view === 'results') {
       const d = L.entry && L.entry.dojo;
       text(d && d.mode === 'gate' ? 'Gatekeeper results' : 'Temple session', 90, 150, `800 88px ${F.disp}`, C.fg);
@@ -4052,7 +4088,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     if (L.sel.train) L.override = trainCfg(L.sel.train);
     else if (L.sel.field) L.override = fieldCfg(L.sel.field);
     else if (L.sel.breath) { if (!styleReady(L.sel.breath)) return; L.override = cfgFor(L.sel.breath); }
-    else { L.override = null; if (L.sel.cfg) { Object.assign(state, DEFAULTS, L.sel.cfg); delete state.kind; } changed(); }
+    else { if ((L.sel.cfg || state).spectrum && !spectrumOK()) return; L.override = null; if (L.sel.cfg) { Object.assign(state, DEFAULTS, L.sel.cfg); delete state.kind; } changed(); }
     mode = 'fadeout'; fadeTarget = 0;
   }
   async function finish(reason) {
@@ -4218,12 +4254,12 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   }
 
   // Desktop preview, used for testing on a flat screen: renders one still view of a room.
-  function preview(canvas, id, { yaw = 0, pitch = 0, view = 'journeys', panel = true, t = 3, tab = null, hover = null, hoverAgo = 0, lset = null } = {}) {
+  function preview(canvas, id, { yaw = 0, pitch = 0, view = 'journeys', panel = true, t = 3, tab = null, hover = null, hoverAgo = 0, lset = null, sel = null } = {}) {
     if (tab) L.tab = tab;
     hovered = new Set(hover ? [hover] : []); if (hover) hoverSince.set(hover, performance.now() - hoverAgo);
     const g = canvas.getContext('webgl2', { antialias: true }) || canvas.getContext('webgl');
     init(g); roomId = id; bake(roomOf(id));
-    L.view = view; if (view === 'detail') L.sel = journeys()[1] || journeys()[0];
+    L.view = view; if (view === 'detail') L.sel = (sel && journeys().find(j => j.name === sel)) || journeys()[1] || journeys()[0];
     if (lset) Object.assign(L, lset);
     const eye = [0, 1.6, 0];
     const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
