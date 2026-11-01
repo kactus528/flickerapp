@@ -3595,22 +3595,41 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       text('Choose a journey', 90, 150, `800 88px ${F.disp}`, C.fg);
       const TW = 196, TG = 14, tabs = [['flicker', 'Flicker'], ['breath', 'Breath'], ['field', 'Field'], ['train', 'Train']], tx0 = PW - 90 - tabs.length * TW - (tabs.length - 1) * TG;
       tabs.forEach(([k, label], i) =>
-        pill('tab-' + k, tx0 + i * (TW + TG), 82, TW, 96, label, { selected: L.tab === k, size: 40 }, () => { L.tab = k; try { localStorage.setItem('gf-lobbytab', k); } catch {} panelDirty = true; }));
+        pill('tab-' + k, tx0 + i * (TW + TG), 82, TW, 96, label, { selected: L.tab === k, size: 40 }, () => { L.tab = k; L.scroll = L.scrollTarget = 0; try { localStorage.setItem('gf-lobbytab', k); } catch {} panelDirty = true; }));
       pill('journal', tx0 - 30 - 210, 82, 210, 96, 'Journal', { size: 40 }, () => openVRJournal());
       text('Point and pull the trigger to choose · squeeze the grip to bring this panel in front of you', 92, 212, `400 36px ${F.body}`, C.muted);
-      // Cards get more compact when there are four rows, so they always clear the room bar at the bottom.
-      const items = journeys(), cols = 3, gx = 30, cw = (PW - 180 - gx * (cols - 1)) / cols, tight = Math.ceil(items.length / cols) > 3;
-      const ch = tight ? 182 : 214, gy = tight ? 16 : 26, o1 = tight ? 58 : 68, o2 = tight ? 102 : 116, o3 = tight ? 148 : 166;
+      // Cards scroll inside a window when there are more than fit, with a browser-style scrollbar on the right
+      // (point and pull the trigger on the bar to page, or push either thumbstick up or down).
+      const items = journeys(), cols = 3, gx = 30, ch = 214, gy = 26, o1 = 68, o2 = 116, o3 = 166;
+      const VT = 262, VH = 790, rows = Math.ceil(items.length / cols), contentH = rows * (ch + gy) - gy;
+      L.maxScroll = Math.max(0, contentH - VH);
+      L.scroll = Math.max(0, Math.min(L.maxScroll, L.scroll || 0)); L.scrollTarget = Math.max(0, Math.min(L.maxScroll, L.scrollTarget ?? L.scroll));
+      const scrolling = L.maxScroll > 0, cw = (PW - 180 - (scrolling ? 50 : 0) - gx * (cols - 1)) / cols;
+      cx.save(); cx.beginPath(); cx.rect(70, VT - 8, PW - 140, VH + 8); cx.clip();
       items.forEach((it, i) => {
-        const x = 90 + (i % cols) * (cw + gx), y = 262 + Math.floor(i / cols) * (ch + gy);
-        button('j' + i, x, y, cw, ch, hi => {
+        const x = 90 + (i % cols) * (cw + gx), y = VT + Math.floor(i / cols) * (ch + gy) - L.scroll;
+        const y0 = Math.max(y, VT), y1 = Math.min(y + ch, VT + VH);
+        if (y1 - y0 < 24) return;   // off screen: not drawn, not pointable
+        buttons.push({ id: 'j' + i, x, y: y0, w: cw, h: y1 - y0, onClick: () => { L.sel = it; L.view = 'detail'; panelDirty = true; } });
+        ((hi) => {
           rr(x, y, cw, ch, 28); cx.fillStyle = hi ? C.cardHi : C.card; cx.fill();
           cx.lineWidth = 3; cx.strokeStyle = hi ? C.accent : C.line; cx.stroke();
           text(it.name, x + 34, y + o1, `500 46px ${F.body}`, C.fg);
           text(it.breath ? `breath only · ~${styleMinutes(it.breath)} min` : it.field ? `no flicker · ~${fieldMinutes(it.field)} min` : it.train ? `focus · ~${trainMinutes(it.train)} min` : metaOf(it.cfg), x + 34, y + o2, `400 32px ${F.mono}`, C.muted);
           ticker(it.short, x + 34, y + o3, cw - 68, `400 33px ${F.body}`, it.caution ? C.warn : hi ? C.fg : C.muted, hi, hoverSince.get('j' + i) || 0);
-        }, () => { L.sel = it; L.view = 'detail'; panelDirty = true; });
+        })(hovered.has('j' + i));
       });
+      cx.restore();
+      if (scrolling) {
+        const tx = PW - 90 - 22, thumbH = Math.max(90, VH * VH / contentH), thumbY = VT + (VH - thumbH) * (L.scroll / L.maxScroll);
+        button('scrollbar', tx - 24, VT, 70, VH, hi => {
+          rr(tx, VT, 22, VH, 11); cx.fillStyle = hi ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)'; cx.fill();
+          rr(tx + 3, thumbY + 3, 16, thumbH - 6, 8); cx.fillStyle = hi ? C.accent : 'rgba(255,255,255,0.45)'; cx.fill();
+        }, () => {
+          const page = (ch + gy) * 2;
+          L.scrollTarget = Math.max(0, Math.min(L.maxScroll, (L.scrollTarget ?? L.scroll) + (L.hitY < thumbY ? -page : L.hitY > thumbY + thumbH ? page : 0)));
+        });
+      }
       // room chooser + exit
       const by = 1090;
       text('ROOM', 92, by + 52, `400 30px ${F.mono}`, C.muted);
@@ -4114,7 +4133,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     if (mode === 'running') { if (S?.dojo) { if (S.respond()) pulse(e.inputSource, 0.35, 25); } else finish('stopped'); return; }
     if (mode !== 'menu' && mode !== 'fadein') return;
     const s = sources.get(e.inputSource); const b = s && s.hit && buttonAt(s.hit.px, s.hit.py);
-    if (b) { pulse(e.inputSource, 0.6, 30); b.onClick(); panelDirty = true; }
+    if (b) { pulse(e.inputSource, 0.6, 30); L.hitY = s.hit.py; b.onClick(); panelDirty = true; }
   }
   function onSqueeze() { if (mode === 'running') { if (!S?.dojo) finish('stopped'); } else placed = false; }
   let holdTimer = null;   // in the Dojo, holding the grip for 1.5 s stops (the trigger is your response button)
@@ -4241,6 +4260,12 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
         sources.set(src, { hit, hoverId: b ? b.id : null });
         if (b) hoverNow.add(b.id);
         if (src.targetRayMode === 'tracked-pointer') rays.push({ o, d, hit });
+      }
+      // Thumbstick scrolls the journey list; scrolling eases toward its target.
+      if (L.view === 'journeys' && L.maxScroll > 0) {
+        for (const src of xr.inputSources) { const ax = src.gamepad && src.gamepad.axes; const y = ax && ax.length >= 4 ? ax[3] : 0;
+          if (Math.abs(y) > 0.2) L.scrollTarget = Math.max(0, Math.min(L.maxScroll, (L.scrollTarget ?? L.scroll) + y * dt * 1100)); }
+        if (Math.abs((L.scrollTarget ?? L.scroll) - L.scroll) > 0.5) { L.scroll += ((L.scrollTarget ?? L.scroll) - L.scroll) * Math.min(1, dt * 12); panelDirty = true; }
       }
       if (hoverNow.size !== hovered.size || [...hoverNow].some(h => !hovered.has(h))) {
         for (const id of hoverNow) if (!hovered.has(id)) hoverSince.set(id, performance.now());
