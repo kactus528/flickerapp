@@ -168,72 +168,68 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem; z-index: 70; max-width: calc(100% - 32px); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
-/* ---- Safety notice in the boot screen's arcade style (readable: sentence case, no glitches on the warning, nothing flashes) ---- */
-.screen[data-screen="welcome"] { font-family: "VT323", "IBM Plex Mono", ui-monospace, monospace; color: #c8f7d4; font-size: 22px; line-height: 1.18; letter-spacing: 0.02em; gap: 16px; }
-.screen[data-screen="welcome"]::before { content: ""; position: fixed; inset: 0; z-index: -1; background: radial-gradient(ellipse at center, #07090b 55%, #000 100%); }
+/* ---- Safety notice in the boot screen's arcade style (Virtual Boy reds; readable sentence case; nothing flashes) ---- */
+.screen[data-screen="welcome"] { font-family: "VT323", "IBM Plex Mono", ui-monospace, monospace; color: #ff3426; font-size: 22px; line-height: 1.18; letter-spacing: 0.02em; gap: 16px; }
+.screen[data-screen="welcome"]::before { content: ""; position: fixed; inset: 0; z-index: -1; background: radial-gradient(ellipse at center, #000 55%, #000 100%); }
 .screen[data-screen="welcome"]::after { content: ""; position: fixed; inset: 0; z-index: 60; pointer-events: none;
-  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.26) 2px 3px), radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.5) 100%); }
-.screen[data-screen="welcome"] .rhdr { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #7ff3ff; text-shadow: 0 0 6px rgba(127,243,255,0.45); font-size: 21px; }
-.screen[data-screen="welcome"] .hazard { height: 12px; background: repeating-linear-gradient(-45deg, #ffd257 0 12px, #0b0b0b 12px 24px); opacity: 0.85; margin-top: -6px; }
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.16) 2px 3px), radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.5) 100%); }
+.screen[data-screen="welcome"] .rhdr { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #ff7466; text-shadow: 0 0 6px rgba(255,116,102,0.45); font-size: 21px; }
+.screen[data-screen="welcome"] .hazard { height: 12px; background: repeating-linear-gradient(-45deg, #e8180c 0 12px, #000 12px 24px); opacity: 0.85; margin-top: -6px; }
 .screen[data-screen="welcome"] h1 { font-family: "VT323", ui-monospace, monospace; font-weight: 400; font-size: clamp(2.1rem, 11vw, 4.6rem); line-height: 0.95; letter-spacing: 0.03em; margin: 4px 0 6px; overflow-wrap: anywhere;
-  color: #c8f7d4; text-shadow: 0 0 10px rgba(127,243,255,0.35), 0 0 2px rgba(200,247,212,0.8); text-transform: uppercase; }
-.screen[data-screen="welcome"] h1 span { color: #ff6b5e; text-shadow: 0 0 10px rgba(255,107,94,0.5); }
-.screen[data-screen="welcome"] h1.glitch { transform: translateX(var(--gx, 3px)); text-shadow: -2px 0 rgba(255,60,60,0.55), 2px 0 rgba(60,220,255,0.55); }
-.screen[data-screen="welcome"] .lede { font-size: 22px; color: #c8f7d4; text-shadow: 0 0 5px rgba(200,247,212,0.25); }
-.screen[data-screen="welcome"] .warning { border: 4px double #ffd257; border-radius: 0; background: rgba(255,210,87,0.04); padding: 14px 16px; gap: 10px; box-shadow: 0 0 18px rgba(255,210,87,0.08) inset; }
-.screen[data-screen="welcome"] .warning h2 { font-family: "VT323", ui-monospace, monospace; font-weight: 400; font-size: 26px; letter-spacing: 0.08em; color: #ffd257; text-shadow: 0 0 8px rgba(255,210,87,0.5); }
+  color: #b8261a; text-shadow: 0 0 10px rgba(255,116,102,0.35), 0 0 2px rgba(255,52,38,0.8); text-transform: uppercase; }
+.screen[data-screen="welcome"] h1 span { color: #ff1a0d; text-shadow: 0 0 10px rgba(255,26,13,0.5); }
+.screen[data-screen="welcome"] .lede { font-size: 22px; color: #ff3426; text-shadow: 0 0 5px rgba(255,52,38,0.25); }
+.screen[data-screen="welcome"] .warning { border: 4px double #ff8a7c; border-radius: 0; background: rgba(255,138,124,0.04); padding: 14px 16px; gap: 10px; box-shadow: 0 0 18px rgba(255,138,124,0.08) inset; }
+.screen[data-screen="welcome"] .warning h2 { font-family: "VT323", ui-monospace, monospace; font-weight: 400; font-size: 26px; letter-spacing: 0.08em; color: #ff8a7c; text-shadow: 0 0 8px rgba(255,138,124,0.5); }
 .screen[data-screen="welcome"] .warning h2::before { content: "!! "; } .screen[data-screen="welcome"] .warning h2::after { content: " !!"; }
-.screen[data-screen="welcome"] .warning p { font-size: 21px; color: #f3ead0; }
-.screen[data-screen="welcome"] .consent { font-size: 21px; color: #c8f7d4; align-items: center; gap: 12px; }
-.screen[data-screen="welcome"] .consent input { appearance: none; -webkit-appearance: none; width: 28px; height: 28px; margin: 0; border: 2px solid #6dff9a; background: transparent;
-  display: grid; place-items: center; cursor: pointer; box-shadow: 0 0 8px rgba(109,255,154,0.35); }
-.screen[data-screen="welcome"] .consent input::after { content: "X"; font-family: "VT323", monospace; font-size: 26px; line-height: 1; color: #6dff9a; text-shadow: 0 0 8px rgba(109,255,154,0.7); opacity: 0; }
+.screen[data-screen="welcome"] .warning p { font-size: 21px; color: #ff5547; }
+.screen[data-screen="welcome"] .consent { font-size: 21px; color: #ff3426; align-items: center; gap: 12px; }
+.screen[data-screen="welcome"] .consent input { appearance: none; -webkit-appearance: none; width: 28px; height: 28px; margin: 0; border: 2px solid #ff3426; background: transparent;
+  display: grid; place-items: center; cursor: pointer; box-shadow: 0 0 8px rgba(255,52,38,0.35); }
+.screen[data-screen="welcome"] .consent input::after { content: "X"; font-family: "VT323", monospace; font-size: 26px; line-height: 1; color: #ff3426; text-shadow: 0 0 8px rgba(255,52,38,0.7); opacity: 0; }
 .screen[data-screen="welcome"] .consent input:checked::after { opacity: 1; }
 .screen[data-screen="welcome"] .consent input:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-.screen[data-screen="welcome"] .foot { background: linear-gradient(to top, #050608 75%, transparent); }
+.screen[data-screen="welcome"] .foot { background: linear-gradient(to top, #000 75%, transparent); }
 .screen[data-screen="welcome"] #agree { font-family: "VT323", ui-monospace, monospace; font-weight: 400; font-size: 30px; letter-spacing: 0.08em; text-transform: uppercase;
-  background: rgba(109,255,154,0.06); color: #6dff9a; border: 2px solid #6dff9a; border-radius: 0; padding: 12px; text-shadow: 0 0 8px rgba(109,255,154,0.6); box-shadow: 0 0 14px rgba(109,255,154,0.25); }
-.screen[data-screen="welcome"] #agree:disabled { color: rgba(200,247,212,0.35); border-color: rgba(200,247,212,0.25); background: transparent; text-shadow: none; box-shadow: none; cursor: not-allowed; }
-.screen[data-screen="welcome"] #agree:not(:disabled):hover { background: rgba(109,255,154,0.14); }
+  background: rgba(255,52,38,0.06); color: #ff3426; border: 2px solid #ff3426; border-radius: 0; padding: 12px; text-shadow: 0 0 8px rgba(255,52,38,0.6); box-shadow: 0 0 14px rgba(255,52,38,0.25); }
+.screen[data-screen="welcome"] #agree:disabled { color: rgba(255,52,38,0.35); border-color: rgba(255,52,38,0.25); background: transparent; text-shadow: none; box-shadow: none; cursor: not-allowed; }
+.screen[data-screen="welcome"] #agree:not(:disabled):hover { background: rgba(255,52,38,0.14); }
 .screen[data-screen="welcome"] #agree:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .screen[data-screen="welcome"] > * { min-width: 0; }
 @media (max-width: 520px) { .screen[data-screen="welcome"], .screen[data-screen="welcome"] .lede, .screen[data-screen="welcome"] .warning p, .screen[data-screen="welcome"] .consent { font-size: 19px; }
   .screen[data-screen="welcome"] .warning h2 { font-size: 22px; letter-spacing: 0.04em; } .screen[data-screen="welcome"] .rhdr { font-size: 18px; } .screen[data-screen="welcome"] #agree { font-size: 26px; } }
 
 /* ---- Boot: arcade-style hardware check, shown every time the app opens ----
-   It comes before the seizure warning, so nothing here flashes: glitches are small, dim and at most ~2 a second. */
-#boot { position: fixed; inset: 0; z-index: 100; background: #050608; color: #c8f7d4; overflow: auto; cursor: pointer;
+   Virtual Boy style: shades of one red on black. It comes before the seizure warning, so nothing here flashes. */
+#boot { position: fixed; inset: 0; z-index: 100; background: #000; color: #ff3426; overflow: auto; cursor: pointer;
   font-family: "VT323", "IBM Plex Mono", ui-monospace, monospace; font-size: 21px; line-height: 1.12; letter-spacing: 0.02em;
   padding: max(18px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px));
   transition: opacity 0.45s; }
 #boot.out { opacity: 0; pointer-events: none; }
 #boot::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
-  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.28) 2px 3px),
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.16) 2px 3px),
               radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%); }
 #boot .wrap { max-width: 680px; margin: 0 auto; position: relative; }
-#boot .hdr { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #7ff3ff; text-shadow: 0 0 6px rgba(127,243,255,0.45); }
+#boot .hdr { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #ff7466; text-shadow: 0 0 6px rgba(255,116,102,0.45); }
 #boot .bars { display: grid; grid-template-columns: repeat(8, 1fr); height: 14px; margin: 10px 0 6px; opacity: 0.75; }
-#boot .bars i:nth-child(1) { background: #d8d8d8; } #boot .bars i:nth-child(2) { background: #d8d800; } #boot .bars i:nth-child(3) { background: #00d8d8; }
-#boot .bars i:nth-child(4) { background: #00d800; } #boot .bars i:nth-child(5) { background: #d800d8; } #boot .bars i:nth-child(6) { background: #d80000; }
-#boot .bars i:nth-child(7) { background: #0000d8; } #boot .bars i:nth-child(8) { background: #101010; }
+#boot .bars i:nth-child(1), #boot .bars i:nth-child(8) { background: #ff2a1a; } #boot .bars i:nth-child(2), #boot .bars i:nth-child(7) { background: #c01208; }
+#boot .bars i:nth-child(3), #boot .bars i:nth-child(6) { background: #780a04; } #boot .bars i:nth-child(4), #boot .bars i:nth-child(5) { background: #300300; }
 #boot .grid { height: 46px; margin-bottom: 10px; opacity: 0.5;
-  background-image: linear-gradient(rgba(200,247,212,0.55) 1px, transparent 1px), linear-gradient(90deg, rgba(200,247,212,0.55) 1px, transparent 1px);
-  background-size: 23px 23px; border: 1px solid rgba(200,247,212,0.55); }
-#boot .bl { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; text-shadow: 0 0 5px rgba(200,247,212,0.35); min-height: 1.12em; }
+  background-image: linear-gradient(rgba(255,52,38,0.55) 1px, transparent 1px), linear-gradient(90deg, rgba(255,52,38,0.55) 1px, transparent 1px);
+  background-size: 23px 23px; border: 1px solid rgba(255,52,38,0.55); }
+#boot .bl { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; text-shadow: 0 0 5px rgba(255,52,38,0.35); min-height: 1.12em; }
 #boot .bl .k { flex: none; }
-#boot .bl .d { flex: 1; overflow: hidden; color: rgba(200,247,212,0.35); }
+#boot .bl .d { flex: 1; overflow: hidden; color: rgba(255,52,38,0.35); }
 #boot .bl .d::before { content: " . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ."; }
 #boot .bl .v { flex: none; max-width: 62%; overflow: hidden; text-overflow: ellipsis; text-align: right; }
-#boot .ok { color: #6dff9a; text-shadow: 0 0 6px rgba(109,255,154,0.5); }
-#boot .warn { color: #ffd257; text-shadow: 0 0 6px rgba(255,210,87,0.45); }
-#boot .bad { color: #ff6b5e; text-shadow: 0 0 6px rgba(255,107,94,0.45); }
-#boot .dim { color: rgba(200,247,212,0.55); }
-#boot .sec { color: #7ff3ff; margin-top: 8px; text-shadow: 0 0 6px rgba(127,243,255,0.45); }
+#boot .ok { color: #ff3426; text-shadow: 0 0 6px rgba(255,52,38,0.5); }
+#boot .warn { color: #ff8a7c; text-shadow: 0 0 6px rgba(255,138,124,0.45); }
+#boot .bad { color: #ff1a0d; text-shadow: 0 0 6px rgba(255,26,13,0.45); }
+#boot .dim { color: rgba(255,52,38,0.55); }
+#boot .sec { color: #ff7466; margin-top: 8px; text-shadow: 0 0 6px rgba(255,116,102,0.45); }
 #boot .verdict { margin-top: 12px; }
-#boot .press { margin-top: 14px; text-align: center; color: #fff; animation: bootBlink 1.2s steps(2, jump-none) infinite; }
+#boot .press { margin-top: 14px; text-align: center; color: #ff7466; animation: bootBlink 1.2s steps(2, jump-none) infinite; }
 @keyframes bootBlink { 50% { opacity: 0.25; } }
-#boot .glitch { transform: translateX(var(--gx, 3px)); text-shadow: -2px 0 rgba(255,60,60,0.55), 2px 0 rgba(60,220,255,0.55); }
-#boot .tear { position: absolute; left: 0; height: 5px; background: rgba(200,247,212,0.16); pointer-events: none; z-index: 1; }
 #boot .cursor::after { content: "█"; animation: bootBlink 1s steps(2, jump-none) infinite; margin-left: 2px; }
 @media (max-width: 520px) { #boot { font-size: 17px; } #boot .bl { flex-wrap: wrap; } #boot .bl .v { max-width: none; white-space: normal; flex: 1 0 auto; text-align: right; } }
 @media (prefers-reduced-motion: reduce) { #boot .press, #boot .cursor::after { animation: none; } }
@@ -4392,8 +4388,8 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
 <script>
 // ================= Boot: arcade-style system check =================
 // Runs real tests of what the app needs (GPU and shader precision, refresh rate and frame-timing stability, exact flicker
-// rates, VR, audio and the phase-locked tone engine, microphone, storage, battery...) and prints them like 80s/90s arcade
-// service mode. Tap during the check to skip ahead; tap again to continue to the safety notice.
+// rates, VR, audio and the phase-locked tone engine, microphone, storage, battery...) and prints them in red on black,
+// Virtual Boy style. Tap during the check to skip ahead; tap again to continue to the safety notice.
 (() => {
   const boot = document.getElementById('boot'), log = document.getElementById('bootLog');
   if (!boot) return;
@@ -4451,7 +4447,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   // ---------- printing ----------
   const line = (k, cls = '') => { const el = document.createElement('div'); el.className = 'bl ' + cls; el.innerHTML = '<span class="k"></span><span class="d"></span><span class="v"></span>';
     el.querySelector('.k').textContent = k; log.append(el); boot.scrollTop = boot.scrollHeight; return el; };
-  const set = (el, v, st) => { const s = el.querySelector('.v'); s.textContent = v; s.className = 'v ' + (st || ''); };
+  const set = (el, v, st) => { const s = el.querySelector('.v'); s.textContent = (st === 'warn' ? '! ' : st === 'bad' ? '!! ' : '') + v; s.className = 'v ' + (st || ''); };   // one color: markers tell notes and faults apart
   const text = (t, cls) => { const el = document.createElement('div'); el.className = cls; el.textContent = t; log.append(el); boot.scrollTop = boot.scrollHeight; return el; };
   let warns = 0, bads = 0;
   async function row(k, promise, fmt) {
@@ -4459,8 +4455,6 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     await sleep(fast ? 0 : 70 + Math.random() * 110);
     let r; try { r = await promise; } catch { r = null; }
     const [v, st] = fmt(r); if (st === 'warn') warns++; if (st === 'bad') bads++;
-    // brief scrambled readout before the value settles (small and dim: no flashing)
-    if (!fast && !reduce) { const s = el.querySelector('.v'); s.classList.remove('cursor'); for (let i = 0; i < 3; i++) { s.textContent = v.replace(/[^\s]/g, () => '▓▒░#%$@&*'[Math.floor(Math.random() * 9)]); await sleep(35); } }
     set(el, v, st);
   }
   const up = s => String(s).toUpperCase();
@@ -4503,24 +4497,6 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     done = true;
   }
 
-  // ---------- small, dim glitches (never a full-screen flash) ----------
-  let gTimer = null;
-  function glitch() {
-    if (!boot.isConnected || boot.classList.contains('out')) return;
-    const rows = log.querySelectorAll('.bl, .dim, .sec');
-    if (rows.length && Math.random() < 0.7) {
-      const el = rows[Math.floor(Math.random() * rows.length)];
-      el.style.setProperty('--gx', (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 4)) + 'px');
-      el.classList.add('glitch'); setTimeout(() => el.classList.remove('glitch'), 90 + Math.random() * 90);
-    } else {
-      const t = document.createElement('div'); t.className = 'tear';
-      t.style.top = Math.floor(Math.random() * Math.max(80, log.offsetHeight + 120)) + 'px'; t.style.width = (20 + Math.random() * 50) + '%';
-      t.style.left = Math.random() * 40 + '%'; boot.querySelector('.wrap').append(t); setTimeout(() => t.remove(), 110);
-    }
-    gTimer = setTimeout(glitch, 450 + Math.random() * 900);   // at most ~2 small events a second
-  }
-  if (!reduce) gTimer = setTimeout(glitch, 600);
-
   // ---------- continue ----------
   function blip() {   // tiny arcade "coin" sound on continue (allowed: it follows a tap)
     try { const AC = window.AudioContext || window.webkitAudioContext; const c = new AC(), o = c.createOscillator(), g = c.createGain(), t = c.currentTime;
@@ -4530,20 +4506,11 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   }
   function proceed() {
     if (!done) { fast = true; return; }   // first tap: finish printing now
-    clearTimeout(gTimer); blip(); boot.classList.add('out');
+    blip(); boot.classList.add('out');
     setTimeout(() => boot.remove(), 500);
     window.removeEventListener('keydown', onKey);
   }
   const onKey = e => { if (e.key === 'Tab') return; proceed(); };
-  // the safety notice's title gets the same small, occasional glitch (never the warning text itself)
-  if (!reduce) (function titleGlitch() {
-    const t = document.getElementById('h-welcome'), scr = t && t.closest('.screen');
-    if (t && scr && !scr.hidden && !document.getElementById('boot')) {
-      t.style.setProperty('--gx', (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 3)) + 'px');
-      t.classList.add('glitch'); setTimeout(() => t.classList.remove('glitch'), 100 + Math.random() * 80);
-    }
-    if (!scr || !scr.dataset.left) setTimeout(titleGlitch, 1400 + Math.random() * 2200);
-  })();
   boot.addEventListener('pointerdown', proceed);
   window.addEventListener('keydown', onKey);
   run();
