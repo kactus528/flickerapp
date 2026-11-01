@@ -524,6 +524,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
           <button class="chip" data-v="rings">Radial pulse</button>
           <button class="chip" data-v="tunnel">Tunnel</button>
           <button class="chip" data-v="ripples">Ripples</button>
+          <button class="chip" data-v="crisp">Layered rings</button>
         </div>
         <p class="note">Patterns are for eyes-open sessions. With eyes closed, your eyelids blur them back into full field.</p>
       </div>
@@ -538,9 +539,9 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
             <input type="range" id="pscale" data-key="pscale" min="2" max="12" step="1">
           </div>
           <div class="row">
-            <label for="pdepth">Ripple strength <output data-for="pdepth"></output></label>
-            <input type="range" id="pdepth" data-key="pdepth" min="0.2" max="0.8" step="0.05">
-            <p class="note">Soft rings that flow outward from the center. Kept at modest contrast: strong moving patterns combined with flicker add seizure risk.</p>
+            <label for="pdepth">Ring strength <output data-for="pdepth"></output></label>
+            <input type="range" id="pdepth" data-key="pdepth" min="0.05" max="0.8" step="0.05">
+            <p class="note" id="ringNote"></p>
           </div>
         </div>
       </div>
@@ -1239,7 +1240,7 @@ function describe(c, withBreath = true) {
   if (c.lock) parts.push('frame-locked');
   if (!c.spectrum) parts.push(c.cj ? (PALETTES[c.palette]?.name || 'Color') + ' journey' : colorName(c.flash));
   if (c.spectrum) parts.push('rainbow steps');
-  if (c.pattern !== 'full') parts.push({ spiral: 'spiral', rings: 'radial pulse', tunnel: 'tunnel', ripples: 'ripples' }[c.pattern]);
+  if (c.pattern !== 'full') parts.push({ spiral: 'spiral', rings: 'radial pulse', tunnel: 'tunnel', ripples: 'ripples', crisp: 'layered rings' }[c.pattern]);
   if (c.split === 'alt') parts.push('alternate eyes'); else if (c.split === 'colors') parts.push('two-color eyes');
   if (c.iso) parts.push('isochronic');
   if (c.mono) parts.push('monaural beats');
@@ -1288,7 +1289,11 @@ function syncUI() {
   show('#cjRows', state.cj);
   show('#flashRow', !state.cj);
   show('#pspeedRow', state.pattern !== 'full');
-  show('#rippleRows', state.pattern === 'ripples');
+  show('#rippleRows', state.pattern === 'ripples' || state.pattern === 'crisp');
+  if (state.pattern === 'crisp' && state.pdepth > 0.5) { state.pdepth = 0.5; }   // crisp bands are capped lower (seizure safety)
+  { const pd = $('#pdepth'); if (pd) pd.max = state.pattern === 'crisp' ? 0.5 : 0.8; const rn = $('#ringNote'); if (rn) rn.textContent = state.pattern === 'crisp'
+      ? 'Three overlapping sets of crisp circles, each with its own spacing and speed, so the widths look almost random but never quite are. Shades differ only subtly. Capped at 50%: crisp moving patterns combined with flicker add seizure risk.'
+      : 'Soft rings that flow outward from the center. Kept at modest contrast: strong moving patterns combined with flicker add seizure risk.'; }
   show('#splitColorRow', state.split === 'colors');
   show('#dotRows', state.dot);
   show('#toneRows', state.iso || state.bin || state.mono);
@@ -1506,6 +1511,10 @@ const RESEARCH = [
   { name: 'Gamma Ripples', time: '~22 min',
     why: 'Gamma 40 with soft rings flowing outward from the center for the whole session, like the waves many people see as fast flicker begins. Eyes open, gaze resting on the dot. Tune the ripples under Advanced → Light → Pattern.',
     cfg: { ...BASE, hz: 40, flash: '#ffffff', bright: 45, mins: 20, pattern: 'ripples', pspeed: 1, pscale: 5, pdepth: 0.5, iso: true, mono: true, bin: false, pitch: 320, toneVol: 30,
+           dot: true, dotSize: 0.35, dotColor: '#000000', dotMode: 'steady', bgOn: true, bg: 'pink', bgVol: 20, bgSwell: false, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40 } },
+  { name: 'Gamma Rings', time: '~22 min',
+    why: 'Gamma 40 with three layered sets of crisp circles flowing out from the center at different spacings and speeds, so the pattern looks almost random but never repeats. Shades differ only slightly. Eyes open, gaze on the dot. Adjust spacing, strength and speed under Advanced → Light → Pattern; try it with rainbow steps.',
+    cfg: { ...BASE, hz: 40, flash: '#ffffff', bright: 45, mins: 20, pattern: 'crisp', pspeed: 1, pscale: 6, pdepth: 0.15, iso: true, mono: true, bin: false, pitch: 320, toneVol: 30,
            dot: true, dotSize: 0.35, dotColor: '#000000', dotMode: 'steady', bgOn: true, bg: 'pink', bgVol: 20, bgSwell: false, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40 } },
   { name: 'Drum-locked journey', time: '~22 min',
     why: 'Steady drumming helped experienced practitioners turn inward in brain-scan research. Here the drum strikes on every second flash (5 beats a second at 10 Hz), so sound and light share one rhythm.',
@@ -2423,7 +2432,7 @@ function createSession(mode, override) {
       sym,
       // In the Dojo's Gatekeeper the point briefly fades toward the background: that's the target to respond to.
       dot: dotShown ? { rgb: dotRGB.map((v, i) => v * dk + (of[i] - v * dk) * 0.55 * tdim), deg: cfg.dotSize } : null,
-      pattern: { full: 0, spiral: 1, rings: 2, tunnel: 3, ripples: 4 }[cfg.pattern], ptime: t * cfg.pspeed, pscale: cfg.pscale, pdepth: cfg.pdepth
+      pattern: { full: 0, spiral: 1, rings: 2, tunnel: 3, ripples: 4, crisp: 5 }[cfg.pattern], ptime: t * cfg.pspeed, pscale: cfg.pscale, pdepth: Math.min(cfg.pdepth ?? 0.5, cfg.pattern === 'crisp' ? 0.5 : 0.8)
     };
   };
   // ---- Dojo sounds: synthesized, soft, placed in 3D around you ----
@@ -2552,6 +2561,26 @@ void main(){
     // Ripples: soft sine-shaped rings flowing outward from the center (no hard edges), at modest contrast.
     m = 0.5 + 0.5 * sin(TAU * (r * uRing - uT * 0.6));
     m = 1.0 - uDepth * (1.0 - m);
+  }
+  else if (uPat == 5) {
+    // Layered rings: three overlapping sets of crisp-edged bands, each with its own spacing and speed. The spacings
+    // and speeds are irrational ratios of each other, so the combined pattern never repeats: ring widths look almost
+    // random but follow a hidden order. Where bands overlap the shade steps a little darker (4 shades, max uDepth).
+    // Edges are anti-aliased over about one screen pixel so they don't crawl.
+    vec3 k = uRing * vec3(1.0, 0.618, 1.414);    // rings per degree, per layer
+    vec3 v = vec3(0.41, 0.23, 0.67);             // outward speed, per layer
+    vec3 o = vec3(0.0, 0.37, 0.71);              // starting offsets
+    float dark = 0.0;
+    for (int i = 0; i < 3; i++) {
+      float ki = i == 0 ? k.x : (i == 1 ? k.y : k.z);
+      float vi = i == 0 ? v.x : (i == 1 ? v.y : v.z);
+      float oi = i == 0 ? o.x : (i == 1 ? o.y : o.z);
+      float g = fract(r * ki - uT * vi + oi);
+      float e = min(abs(g - 0.5), min(g, 1.0 - g)) * (g >= 0.5 ? 1.0 : -1.0);   // signed distance to nearest edge
+      float aa = 0.75 * ki / uPPR;
+      dark += smoothstep(-aa, aa, e);
+    }
+    m = 1.0 - uDepth * dark / 3.0;
   }
   if (uPat > 0 && uPat < 4) m = smoothstep(0.3, 0.7, m);
   vec3 col = mix(uOff, uFlash, m * uOn);
@@ -3365,6 +3394,7 @@ const Lobby = (() => {
     'Frequency following': 'Light and beats step down 12 → 4.5 Hz together.',
     'Gamma 40': 'Eyes open: a fast 40 Hz shimmer with locked pulses.',
     'Gamma Ripples': 'Soft waves flow out from the center at 40 Hz.',
+    'Gamma Rings': 'Layered crisp circles drift out at 40 Hz.',
     'Classic Ganzflicker': 'Red flicker from the online studies.',
     'Spectrum': 'Each flash is the next color of the rainbow.'
   };
