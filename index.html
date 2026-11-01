@@ -442,11 +442,13 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <div class="row" id="gammaRows">
           <span class="lbl">Gamma rate</span>
           <div class="presets" data-key="hz" role="group" aria-label="Gamma rate">
+            <!-- TEST ONLY: 30 Hz sits at the edge of the 16-30 Hz seizure-risk band. Review before release. -->
+            <button class="chip" data-v="30">30 Hz (test)</button>
             <button class="chip" data-v="40">40 Hz</button>
             <button class="chip" data-v="45">45 Hz</button>
             <button class="chip" data-v="60">60 Hz</button>
           </div>
-          <p class="note">Only rates a headset can show perfectly: 40 Hz (80 Hz screen, 1 frame on, 1 off; or 120 Hz, 2 on, 1 off), 45 Hz (90 Hz screen, 1 on, 1 off) and 60 Hz (120 Hz screen, 1 on, 1 off). In VR the headset switches to the matching screen rate by itself. Around 50–60 Hz most people stop seeing the flicker, though the brain still responds to it.</p>
+          <p class="note">Only rates a headset can show perfectly: 30 Hz (120 Hz screen, 2 frames on, 2 off; test setting, at the edge of the range most likely to provoke seizures), 40 Hz (80 Hz screen, 1 frame on, 1 off; or 120 Hz, 2 on, 1 off), 45 Hz (90 Hz screen, 1 on, 1 off) and 60 Hz (120 Hz screen, 1 on, 1 off). In VR the headset switches to the matching screen rate by itself. Around 50–60 Hz most people stop seeing the flicker, though the brain still responds to it.</p>
         </div>
       </div>
 
