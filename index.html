@@ -1525,7 +1525,7 @@ const RESEARCH = [
            dot: true, dotSize: 0.35, dotColor: '#000000', dotMode: 'steady', bgOn: true, bg: 'pink', bgVol: 20, bgSwell: false, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40 } },
   { name: 'Gamma Rings', time: '~22 min',
     why: 'Gamma 40 with three layered sets of crisp circles flowing out from the center at different spacings and speeds, so the pattern looks almost random but never repeats. Shades differ only slightly. Eyes open, gaze on the dot. Adjust spacing, strength and speed under Advanced → Light → Pattern; try it with rainbow steps.',
-    cfg: { ...BASE, hz: 40, flash: '#ffffff', bright: 45, mins: 20, pattern: 'crisp', pspeed: 1, pscale: 6, pdepth: 0.15, pdir: 'both', iso: true, mono: true, bin: false, pitch: 320, toneVol: 30,
+    cfg: { ...BASE, hz: 40, flash: '#ffffff', bright: 45, mins: 20, pattern: 'crisp', pspeed: 1, pscale: 6, pdepth: 0.2, pdir: 'both', iso: true, mono: true, bin: false, pitch: 320, toneVol: 30,
            dot: true, dotSize: 0.35, dotColor: '#000000', dotMode: 'steady', bgOn: true, bg: 'pink', bgVol: 20, bgSwell: false, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40 } },
   { name: 'Drum-locked journey', time: '~22 min',
     why: 'Steady drumming helped experienced practitioners turn inward in brain-scan research. Here the drum strikes on every second flash (5 beats a second at 10 Hz), so sound and light share one rhythm.',
@@ -2585,22 +2585,26 @@ void main(){
     // and speeds are irrational ratios of each other, so the combined pattern never repeats: ring widths look almost
     // random but follow a hidden order. Where bands overlap the shade steps a little darker (4 shades, max uDepth).
     // Edges are anti-aliased over about one screen pixel so they don't crawl.
-    vec3 k = uRing * vec3(1.0, 0.618, 1.414);    // rings per degree, per layer
-    vec3 v = vec3(0.41, 0.23, 0.67);             // outward speed, per layer
-    if (uDir > 0.5 && uDir < 1.5) v = -v;        // inward: every layer flows toward the center
-    else if (uDir > 1.5) v.y = -v.y;             // both: the middle layer flows inward through the other two
-    vec3 o = vec3(0.0, 0.37, 0.71);              // starting offsets
+    // Outward/inward: three layers, all one way. Both: four layers, two flowing out and two flowing in at similar
+    // speeds, so the inward rings are as easy to see as the outward ones.
+    vec4 k = uRing * vec4(1.0, 0.618, 1.414, 0.786);   // rings per radian, per layer
+    vec4 v = vec4(0.41, 0.33, 0.67, 0.0);               // outward speed, per layer
+    vec4 o = vec4(0.0, 0.37, 0.71, 0.53);               // starting offsets
+    float n = 3.0;
+    if (uDir > 0.5 && uDir < 1.5) v = -v;               // inward: every layer flows toward the center
+    else if (uDir > 1.5) { v = vec4(0.41, -0.45, 0.62, -0.55); n = 4.0; }   // both
     float dark = 0.0;
-    for (int i = 0; i < 3; i++) {
-      float ki = i == 0 ? k.x : (i == 1 ? k.y : k.z);
-      float vi = i == 0 ? v.x : (i == 1 ? v.y : v.z);
-      float oi = i == 0 ? o.x : (i == 1 ? o.y : o.z);
+    for (int i = 0; i < 4; i++) {
+      if (float(i) >= n) break;
+      float ki = i == 0 ? k.x : (i == 1 ? k.y : (i == 2 ? k.z : k.w));
+      float vi = i == 0 ? v.x : (i == 1 ? v.y : (i == 2 ? v.z : v.w));
+      float oi = i == 0 ? o.x : (i == 1 ? o.y : (i == 2 ? o.z : o.w));
       float g = fract(r * ki - uT * vi + oi);
       float e = min(abs(g - 0.5), min(g, 1.0 - g)) * (g >= 0.5 ? 1.0 : -1.0);   // signed distance to nearest edge
       float aa = 0.75 * ki / uPPR;
       dark += smoothstep(-aa, aa, e);
     }
-    m = 1.0 - uDepth * dark / 3.0;
+    m = 1.0 - uDepth * dark / n;
   }
   if (uPat > 0 && uPat < 4) m = smoothstep(0.3, 0.7, m);
   vec3 col = mix(uOff, uFlash, m * uOn);
