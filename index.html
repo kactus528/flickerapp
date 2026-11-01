@@ -355,6 +355,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
             <button class="chip" data-v="6">Theta · 6 Hz</button>
             <button class="chip" data-v="10">Alpha · 10 Hz</button>
             <button class="chip" data-v="12">High alpha · 12 Hz</button>
+            <button class="chip" data-v="40">Gamma · 40 Hz</button>
           </div>
         </div>
       </div>
@@ -1381,6 +1382,10 @@ const RESEARCH = [
     why: 'Inspired by paragraph 7 of the 1983 Army report on the Gateway process: the brain tends to follow a rhythm it is given. Warm light, a binaural beat and a monaural beat all peak at the same instant, tucked into soft pink noise, stepping down from alert 12 Hz to 4.5 Hz theta in five plateaus: pace, then lead.',
     cfg: { ...BASE, rhythm: 'stairs', gStart: 12, gEnd: 4.5, gMin: 20, mins: 25, flash: '#ff991a', bright: 55, bin: true, mono: true, iso: false, pitch: 180, toneVol: 30,
            bgOn: true, bg: 'pink', bgVol: 35, bgSwell: false, breathOn: true, breathRounds: 6, breathSec: 4, breathVol: 40 } },
+  { name: 'Gamma 40', time: '~22 min',
+    why: 'Inspired by 40 Hz gamma research, where light and sound pulsing together at 40 Hz drive the brain\'s strongest rhythmic response. A fast, soft shimmer rather than visions: an alert, focused session. Steady 40 Hz light with 40 Hz pulses and a monaural beat locked to every flash. Exactly 40 Hz needs the headset at 120 Hz; at 90 Hz it runs at 45 Hz.',
+    cfg: { ...BASE, hz: 40, flash: '#ffffff', bright: 45, mins: 20, iso: true, mono: true, bin: false, pitch: 320, toneVol: 30,
+           bgOn: true, bg: 'pink', bgVol: 20, bgSwell: false, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40 } },
   { name: 'Drum-locked journey', time: '~22 min',
     why: 'Steady drumming helped experienced practitioners turn inward in brain-scan research. Here the drum strikes on every second flash (5 beats a second at 10 Hz), so sound and light share one rhythm.',
     cfg: { ...BASE, hz: 10, flash: '#ff991a', bright: 60, mins: 20, breathOn: true, breathRounds: 6, breathSec: 4, breathVol: 40, bgOn: true, bg: 'brown', bgVol: 20, drumOn: true, drumRate: 5, drumSync: true, drumVol: 55 } },
@@ -2071,7 +2076,9 @@ function createSession(mode, override) {
       const u = clamp01((t - (total - W)) / W);
       hz += (12 - hz) * u;
     }
-    return Math.max(3, Math.min(16, hz));
+    // Normal range tops out at 16 Hz. The one exception is a steady gamma setting near 40 Hz (chosen as a preset, never
+    // reached by sliding), so the 16-30 Hz band, where flicker is most likely to provoke seizures, stays out of reach.
+    return Math.max(3, Math.min(cfg.hz >= 30 && cfg.rhythm === 'steady' ? 45 : 16, hz));
   }
   function flashAt(t) {
     if (!cfg.cj) return flashRGB;
@@ -3213,6 +3220,7 @@ const Lobby = (() => {
     'Find your frequency': 'Slowly scans 12 → 8 Hz to find your rate.',
     'Drum-locked journey': 'A drum beats in time with the light.',
     'Frequency following': 'Light and beats step down 12 → 4.5 Hz together.',
+    'Gamma 40': 'A fast 40 Hz shimmer with locked pulses.',
     'Classic Ganzflicker': 'Red flicker from the online studies.'
   };
   let roomId = (() => { try { return localStorage.getItem('gf-room') || 'night'; } catch { return 'night'; } })();
