@@ -343,6 +343,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <div class="presets" data-key="rhythm" role="group" aria-label="Rhythm">
           <button class="chip" data-v="steady">Steady</button>
           <button class="chip" data-v="glide">Journey (glides between rates)</button>
+          <button class="chip" data-v="stairs">Staircase (steps down and holds)</button>
         </div>
       </div>
 
@@ -376,7 +377,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
           <label for="gMin">Glide over <output data-for="gMin"></output></label>
           <input type="range" id="gMin" data-key="gMin" min="1" max="30" step="1">
         </div>
-        <p class="note">The rate eases from start to end over this time, then holds there for the rest of the session.</p>
+        <p class="note" id="glideNote">The rate eases from start to end over this time, then holds there for the rest of the session.</p>
       </div>
 
       <label class="toggle"><input type="checkbox" data-key="drift"> Slow drift (wanders ±1 Hz around the rate)</label>
@@ -510,6 +511,8 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
     <div class="controls">
       <label class="toggle"><input type="checkbox" data-key="iso"> Isochronic tones (a tone that pulses in sync with the light)</label>
       <label class="toggle"><input type="checkbox" data-key="bin"> Binaural beats (best with earbuds)</label>
+      <label class="toggle"><input type="checkbox" data-key="mono"> Monaural beats (a clearer beat that works on speakers too)</label>
+      <p class="note">All tones are locked to the light: every beat and pulse peaks in the middle of each flash.</p>
       <div class="sub" id="toneRows">
         <div class="row">
           <label for="pitch">Tone pitch <output data-for="pitch"></output></label>
@@ -1004,6 +1007,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const hexRGB = h => [1,3,5].map(i => parseInt(h.slice(i, i+2), 16) / 255);
+const isJourney = c => c.rhythm === 'glide' || c.rhythm === 'stairs';
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
@@ -1020,7 +1024,7 @@ const DEFAULTS = {
   flash: '#ffffff', off: '#000000', bright: 70,
   pattern: 'full', pspeed: 1, split: 'both', splitColor: '#3366ff',
   dot: false, dotSize: 0.3, dotColor: '#000000', dotMode: 'steady',
-  iso: false, bin: false, pitch: 200, toneVol: 40,
+  iso: false, bin: false, mono: false, pitch: 200, toneVol: 40,
   bgOn: false, bg: 'rain', bgVol: 30, bgSwell: true, bgSwellSec: 10,
   drumOn: false, drumRate: 4.5, drumSync: false, drumVol: 60,
   affOn: false, affWhen: 'whole', affFade: false, affGap: 6, affVol: 80,
@@ -1117,13 +1121,14 @@ function describe(c, withBreath = true) {
   if (c.kind === 'breath') return `Breath journey · ${c.hbMin} min breathing · ${Math.round(60 / c.hbPace)} breaths a minute` + (c.hbLight ? ` · ${c.hbLightMin} min flicker after` : '');
   const parts = [];
   if (withBreath && c.breathOn) parts.push('breath intro');
-  parts.push(c.rhythm === 'glide' ? `${c.gStart}→${c.gEnd} Hz over ${c.gMin} min` : `${c.hz} Hz`);
+  parts.push(c.rhythm === 'stairs' ? `${c.gStart}→${c.gEnd} Hz in 5 steps over ${c.gMin} min` : c.rhythm === 'glide' ? `${c.gStart}→${c.gEnd} Hz over ${c.gMin} min` : `${c.hz} Hz`);
   if (c.drift) parts.push('drift');
   if (c.lock) parts.push('frame-locked');
   parts.push(c.cj ? (PALETTES[c.palette]?.name || 'Color') + ' journey' : colorName(c.flash));
   if (c.pattern !== 'full') parts.push({ spiral: 'spiral', rings: 'radial pulse', tunnel: 'tunnel' }[c.pattern]);
   if (c.split === 'alt') parts.push('alternate eyes'); else if (c.split === 'colors') parts.push('two-color eyes');
   if (c.iso) parts.push('isochronic');
+  if (c.mono) parts.push('monaural beats');
   if (c.bin) parts.push('binaural');
   if (c.bgOn) parts.push({ rain: 'rain', ocean: 'ocean', drone: 'drone', white: 'white noise', pink: 'pink noise', brown: 'brown noise' }[c.bg]);
   if (c.drumOn) parts.push('drum ' + (c.drumSync ? 'on flashes' : c.drumRate + '/s'));
@@ -1162,13 +1167,16 @@ function syncUI() {
     b.setAttribute('aria-pressed', state.gStart === s && state.gEnd === e && state.gMin === m);
   });
   show('#steadyRows', state.rhythm === 'steady');
-  show('#glideRows', state.rhythm === 'glide');
+  show('#glideRows', isJourney(state));
+  { const gn = $('#glideNote'); if (gn) gn.textContent = state.rhythm === 'stairs'
+      ? 'Five steady plateaus from start to end, each held for a fifth of this time, with a gentle 15-second step between them, then the end rate holds. Pace, then lead: time to settle at each step.'
+      : 'The rate eases from start to end over this time, then holds there for the rest of the session.'; }
   show('#cjRows', state.cj);
   show('#flashRow', !state.cj);
   show('#pspeedRow', state.pattern !== 'full');
   show('#splitColorRow', state.split === 'colors');
   show('#dotRows', state.dot);
-  show('#toneRows', state.iso || state.bin);
+  show('#toneRows', state.iso || state.bin || state.mono);
   show('#lockRows', state.lock);
   show('#breathRows', state.breathOn);
   show('#b_breathRows', state.breathOn);
@@ -1187,8 +1195,8 @@ function syncUI() {
     sleep: 'The flicker fades at the end, but the sounds keep going and slowly fade out, so you can fall asleep. The journal waits for you afterwards.',
     stop: 'The flicker and sound fade out over the last few seconds.'
   }[state.ending];
-  $('#sumLight').textContent = (state.rhythm === 'glide' ? `${state.gStart}→${state.gEnd} Hz` : `${state.hz} Hz`) + ' · ' + (state.cj ? PALETTES[state.palette].name : colorName(state.flash));
-  const snd = [state.iso && 'isochronic', state.bin && 'binaural', state.bgOn && state.bg, state.drumOn && 'drum'].filter(Boolean);
+  $('#sumLight').textContent = (isJourney(state) ? `${state.gStart}→${state.gEnd} Hz` : `${state.hz} Hz`) + ' · ' + (state.cj ? PALETTES[state.palette].name : colorName(state.flash));
+  const snd = [state.iso && 'isochronic', state.bin && 'binaural', state.mono && 'monaural', state.bgOn && state.bg, state.drumOn && 'drum'].filter(Boolean);
   $('#sumSound').textContent = snd.length ? snd.join(' · ') : 'off';
   $('#sumAff').textContent = state.affOn ? (affBlob ? 'on' : 'on · not recorded') : 'off';
   const breathS = state.breathOn ? state.breathRounds * breathCycle(state) : 0;
@@ -1201,7 +1209,7 @@ const fmtHz = v => (Math.abs(v - Math.round(v)) < 0.005 ? Math.round(v) : v.toFi
 function lockHint() {
   if (state.drift) return 'With drift on, the rate steps between nearby exact rates instead of sliding smoothly.';
   const rates = state.refresh === 'max' ? [72, 90, 120] : [+state.refresh];
-  if (state.rhythm === 'glide') {
+  if (isJourney(state)) {
     const r = rates[rates.length - 1];
     const steps = []; let last = 0;
     for (let n = Math.round(r / Math.max(state.gStart, state.gEnd)); n <= Math.round(r / Math.min(state.gStart, state.gEnd)); n++) { const v = r / n; if (Math.abs(v - last) > 0.01) steps.push(fmtHz(v)); last = v; }
@@ -1290,7 +1298,7 @@ document.addEventListener('click', e => {
 
 // Advanced settings that Basic doesn't show, so Basic can say when one is still switched on.
 const EXTRAS = [
-  ['rhythm', v => v === 'glide', 'a journey (gliding rate)', { rhythm: 'steady' }],
+  ['rhythm', v => v === 'glide' || v === 'stairs', 'a journey (changing rate)', { rhythm: 'steady' }],
   ['drift', v => v, 'drift', { drift: false }],
   ['cj', v => v, 'a color journey', { cj: false }],
   ['off', v => v !== '#000000', 'a between-flash color', { off: '#000000' }],
@@ -1299,6 +1307,7 @@ const EXTRAS = [
   ['dot', v => v, 'the focus dot', { dot: false }],
   ['iso', v => v, 'isochronic tones', { iso: false }],
   ['bin', v => v, 'binaural beats', { bin: false }],
+  ['mono', v => v, 'monaural beats', { mono: false }],
   ['drumOn', v => v, 'drumming', { drumOn: false }],
   ['affOn', v => v, 'the affirmation', { affOn: false }],
   ['lock', v => !v, 'unlocked timing', { lock: true }]
@@ -1368,6 +1377,10 @@ const RESEARCH = [
   { name: 'Find your frequency', time: '~17 min',
     why: 'Each person\'s visions are tied to particular rates. This slowly steps from 12 Hz down to 8 Hz through the exact frame-locked rates. The current rate is shown small below center: open your eyes when the visuals peak, note the rate in the journal, then use it in Steady mode.',
     cfg: { ...BASE, rhythm: 'glide', gStart: 12, gEnd: 8, gMin: 14, hzShow: true, flash: '#ffffff', bright: 65, mins: 15, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40, bgOn: true, bg: 'pink', bgVol: 30 } },
+  { name: 'Frequency following', time: '~27 min',
+    why: 'Inspired by paragraph 7 of the 1983 Army report on the Gateway process: the brain tends to follow a rhythm it is given. Warm light, a binaural beat and a monaural beat all peak at the same instant, tucked into soft pink noise, stepping down from alert 12 Hz to 4.5 Hz theta in five plateaus: pace, then lead.',
+    cfg: { ...BASE, rhythm: 'stairs', gStart: 12, gEnd: 4.5, gMin: 20, mins: 25, flash: '#ff991a', bright: 55, bin: true, mono: true, iso: false, pitch: 180, toneVol: 30,
+           bgOn: true, bg: 'pink', bgVol: 35, bgSwell: false, breathOn: true, breathRounds: 6, breathSec: 4, breathVol: 40 } },
   { name: 'Drum-locked journey', time: '~22 min',
     why: 'Steady drumming helped experienced practitioners turn inward in brain-scan research. Here the drum strikes on every second flash (5 beats a second at 10 Hz), so sound and light share one rhythm.',
     cfg: { ...BASE, hz: 10, flash: '#ff991a', bright: 60, mins: 20, breathOn: true, breathRounds: 6, breathSec: 4, breathVol: 40, bgOn: true, bg: 'brown', bgVol: 20, drumOn: true, drumRate: 5, drumSync: true, drumVol: 55 } },
@@ -1383,7 +1396,7 @@ function renderResearch() {
     const c = { ...DEFAULTS, ...p.cfg };
     const total = c.mins * 60 + (c.breathOn ? c.breathRounds * breathCycle(c) : 0);
     const tm = document.createElement('span'); tm.textContent = `${c.hz} Hz · ~${Math.round(total / 60)} min`; t.append(tm);
-    if (c.rhythm === 'glide') tm.textContent = `${c.gStart}→${c.gEnd} Hz · ~${Math.round(total / 60)} min`;
+    if (isJourney(c)) tm.textContent = `${c.gStart}→${c.gEnd} Hz · ~${Math.round(total / 60)} min`;
     const w = document.createElement('small'); w.textContent = p.why;
     b.append(t, w);
     if (p.caution) { const c = document.createElement('small'); c.className = 'caution'; c.textContent = 'Higher risk if you might be light-sensitive.'; b.append(c); }
@@ -1796,6 +1809,52 @@ function dojoDraw(R, F, S, view, vp, eyeIdx) {
   R.draw(F, eyeIdx, vp, a[0], a[1], ppr);
 }
 
+// ================= Frequency following: tones locked to the light, sample by sample =================
+// One audio processor makes the binaural beat, the monaural beat and the isochronic pulse from a single beat phase.
+// Each new flash sends the exact time it will appear, so every beat peaks in the middle of the flash and stays locked
+// for the whole session (the light and the sound run on different clocks, so they are re-aligned on every flash).
+const FOLLOW_WORKLET = `
+class Follow extends AudioWorkletProcessor {
+  constructor() {
+    super(); this.f = 10; this.ph = 0; this.c = 200; this.bin = 0; this.mono = 0; this.iso = 0; this.anchor = null; this.done = false;
+    this.pc = 0; this.pm = 0; this.pi = 0;
+    this.port.onmessage = e => { const m = e.data; if (m.cfg) Object.assign(this, m.cfg); if (m.sync) { this.anchor = m.sync.t; this.f = m.sync.hz; } if (m.end) this.done = true; };
+  }
+  process(inputs, outputs) {
+    if (this.done) return false;
+    const out = outputs[0], L = out[0], R = out[1] || out[0], n = L.length, sr = sampleRate, TAU = 6.283185307179586;
+    const nComp = (this.bin ? 1 : 0) + (this.mono ? 1 : 0) + (this.iso ? 1 : 0) || 1, g = 0.8 / Math.sqrt(nComp);
+    for (let i = 0; i < n; i++) {
+      if (this.anchor !== null) {   // pull the beat phase toward the flash schedule: phase 0 at every flash onset
+        const t = currentTime + i / sr; let err = ((t - this.anchor) * this.f) - this.ph; err -= Math.round(err); this.ph += err * 0.004;
+      }
+      this.ph += this.f / sr; this.ph -= Math.floor(this.ph);
+      this.pc += this.c / sr; this.pc -= Math.floor(this.pc);
+      this.pm += this.c * 1.5 / sr; this.pm -= Math.floor(this.pm);
+      this.pi += this.c / sr; this.pi -= Math.floor(this.pi);
+      const beat = TAU * (this.ph - 0.25);   // beats peak a quarter cycle in: the middle of the flash
+      let l = 0, r = 0;
+      if (this.bin) { l += Math.sin(TAU * this.pc) * g; r += Math.sin(TAU * this.pc + beat) * g; }
+      if (this.mono) { const s = 0.5 * (Math.sin(TAU * this.pm) + Math.sin(TAU * this.pm + beat)) * g; l += s; r += s; }
+      if (this.iso) {   // on during the first half of each cycle, like the light, with soft 3 ms edges
+        const p = this.ph, edge = Math.min(0.06, 0.003 * this.f);
+        const gate = p < 0.5 ? Math.min(1, p / edge, (0.5 - p) / edge) : 0;
+        const s = Math.sin(TAU * this.pi) * gate * g; l += s; r += s;
+      }
+      L[i] = l; if (R !== L) R[i] = r;
+    }
+    return true;
+  }
+}
+registerProcessor('follow', Follow);
+`;
+const followModules = new WeakMap();
+function followModule(ctx) {
+  if (!ctx.audioWorklet) return Promise.reject(new Error('no AudioWorklet'));
+  if (!followModules.has(ctx)) followModules.set(ctx, ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([FOLLOW_WORKLET], { type: 'application/javascript' }))));
+  return followModules.get(ctx);
+}
+
 // One timeline drives light, tones, background, affirmation and the ending, for both VR and fullscreen.
 function createSession(mode, override) {
   const cfg = override ? { ...DEFAULTS, ...override } : { ...state };
@@ -1895,10 +1954,15 @@ function createSession(mode, override) {
       A.tones = ctx.createGain(); A.tones.gain.value = 0; A.tones.connect(A.master);
       A.bg = ctx.createGain(); A.bg.gain.value = 0; A.bg.connect(A.master);
       A.aff = ctx.createGain(); A.aff.gain.value = cfg.affVol / 100; A.aff.connect(A.master);
+      const oldTones = () => {
       if (cfg.iso) {
         A.isoOsc = ctx.createOscillator(); A.isoOsc.frequency.value = cfg.pitch;
         A.isoGate = ctx.createGain(); A.isoGate.gain.value = 0;
         A.isoOsc.connect(A.isoGate).connect(A.tones); A.isoOsc.start();
+      }
+      if (cfg.mono && !cfg.bin) {   // fallback monaural: two close tones in both ears
+        A.monoA = ctx.createOscillator(); A.monoB = ctx.createOscillator(); A.monoA.frequency.value = cfg.pitch * 1.5; A.monoB.frequency.value = cfg.pitch * 1.5 + 10;
+        const mg = ctx.createGain(); mg.gain.value = 0.5; A.monoA.connect(mg); A.monoB.connect(mg); mg.connect(A.tones); A.monoA.start(); A.monoB.start();
       }
       if (cfg.bin) {
         const merge = ctx.createChannelMerger(2), mix = ctx.createGain(); mix.gain.value = cfg.iso ? 0.6 : 1;
@@ -1906,6 +1970,15 @@ function createSession(mode, override) {
         A.binL.frequency.value = cfg.pitch; A.binR.frequency.value = cfg.pitch + 10;
         A.binL.connect(merge, 0, 0); A.binR.connect(merge, 0, 1);
         merge.connect(mix).connect(A.tones); A.binL.start(); A.binR.start();
+      }
+      };
+      if (cfg.iso || cfg.bin || cfg.mono) {
+        followModule(ctx).then(() => {
+          if (A.ended) return;
+          const node = new AudioWorkletNode(ctx, 'follow', { numberOfInputs: 0, outputChannelCount: [2] });
+          node.port.postMessage({ cfg: { c: cfg.pitch, bin: cfg.bin ? 1 : 0, mono: cfg.mono ? 1 : 0, iso: cfg.iso ? 1 : 0 } });
+          node.connect(A.tones); A.follow = node;
+        }).catch(() => { if (!A.ended) oldTones(); });
       }
       if (cfg.bgOn) {
         let out = A.bg;
@@ -1982,6 +2055,17 @@ function createSession(mode, override) {
       const u = clamp01(t / (cfg.gMin * 60)), e = u * u * (3 - 2 * u);
       hz = cfg.gStart + (cfg.gEnd - cfg.gStart) * e;
     }
+    if (cfg.rhythm === 'stairs') {
+      // Pace, then lead: five steady plateaus from start to end, each held for a fifth of the time,
+      // with a gentle 15-second step between them, so there is time to settle at each rate.
+      const steps = 5, T = cfg.gMin * 60, seg = T / steps, rate = k => cfg.gStart + (cfg.gEnd - cfg.gStart) * k / (steps - 1);
+      if (t >= T) hz = cfg.gEnd;
+      else {
+        const i = Math.min(steps - 1, Math.floor(t / seg)), into = t - i * seg, tr = Math.min(15, seg * 0.3);
+        hz = rate(i);
+        if (i > 0 && into < tr) { const u = into / tr, e = u * u * (3 - 2 * u); hz = rate(i - 1) + (rate(i) - rate(i - 1)) * e; }
+      }
+    }
     if (cfg.drift) hz += Math.sin(t * 0.21) * 0.6 + Math.sin(t * 0.077) * 0.4;
     if (cfg.ending === 'wake' && t > total - W) {
       const u = clamp01((t - (total - W)) / W);
@@ -2018,6 +2102,15 @@ function createSession(mode, override) {
       phase = (phase + hz * dt) % 1;
       on = phase < 0.5;
     }
+    // Frequency following: tell the tone processor exactly when this flash will be on screen, in audio-clock time.
+    if (on && !S.prevOn && A.follow && t >= 0) {
+      try {
+        const ts = A.ctx.getOutputTimestamp ? A.ctx.getOutputTimestamp() : null, shown = nowMs + 1000 / (refresh || 60);
+        const tAudio = ts && ts.performanceTime > 0 ? ts.contextTime + (shown - ts.performanceTime) / 1000 : A.ctx.currentTime + (A.ctx.outputLatency || 0.02);
+        A.follow.port.postMessage({ sync: { t: tAudio, hz } });
+      } catch {}
+    }
+    S.prevOn = on;
     // After a breath intro the flicker fades in slowly from nothing; otherwise it starts dim and reaches full in 4 s.
     const fadeIn = B ? ease(clamp01(t / EASE)) : FIELD ? ease(clamp01(t / 10)) : TRAIN ? ease(clamp01(t / 8)) : Math.min(1, 0.25 + 0.75 * t / 4);
     const endLight = TAFTER ? (TG - t) / 1.5 : TRAIN ? (TG - t) / 20 : cfg.ending === 'wake' ? (total - t) / W : cfg.ending === 'sleep' ? (total - t) / 20 : (total - t) / 4;
@@ -2100,6 +2193,7 @@ function createSession(mode, override) {
       }
       if (A.isoGate) ramp(A.isoGate.gain, on && t < total + (cfg.ending === 'sleep' ? sleepLen : 0) ? 1 : 0, at, 0.004);
       if (A.binR) ramp(A.binR.frequency, cfg.pitch + hz, at, 0.05);
+      if (A.monoB) ramp(A.monoB.frequency, cfg.pitch * 1.5 + hz, at, 0.05);
       if (cfg.affFade) ramp(A.aff.gain, cfg.affVol / 100 * (1 - 0.8 * clamp01(t / total)), at, 0.2);
       if (A.affBuf && !A.affPlaying && t >= A.affNext && t < total - 2) {
         const s = A.ctx.createBufferSource(); s.buffer = A.affBuf; s.connect(A.aff);
@@ -2259,6 +2353,8 @@ function createSession(mode, override) {
   };
   S.audio = A;   // exposed for testing
   S.stopAudio = () => {
+    A.ended = true;
+    if (A.follow) setTimeout(() => { try { A.follow.port.postMessage({ end: true }); A.follow.disconnect(); } catch {} }, 450);
     if (!A.ctx) return;
     try { A.master.gain.setTargetAtTime(0, A.ctx.currentTime, 0.08); } catch {}
     if (A.ctx === sharedAudioCtx) setTimeout(() => { try { A.master.disconnect(); } catch {} }, 400);
@@ -3116,6 +3212,7 @@ const Lobby = (() => {
     'Deep imagery': 'A long session for complex scenes.',
     'Find your frequency': 'Slowly scans 12 → 8 Hz to find your rate.',
     'Drum-locked journey': 'A drum beats in time with the light.',
+    'Frequency following': 'Light and beats step down 12 → 4.5 Hz together.',
     'Classic Ganzflicker': 'Red flicker from the online studies.'
   };
   let roomId = (() => { try { return localStorage.getItem('gf-room') || 'night'; } catch { return 'night'; } })();
@@ -3444,7 +3541,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   function metaOf(cfg) {
     const c = { ...DEFAULTS, ...(cfg || state) };
     const total = c.mins * 60 + (c.breathOn ? c.breathRounds * breathCycle(c) : 0);
-    return `${c.rhythm === 'glide' ? `${c.gStart}→${c.gEnd}` : c.hz} Hz · ~${Math.round(total / 60)} min`;
+    return `${isJourney(c) ? `${c.gStart}→${c.gEnd}` : c.hz} Hz · ~${Math.round(total / 60)} min`;
   }
   function drawPanel() {
     buttons = []; marquee = false;
