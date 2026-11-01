@@ -168,6 +168,38 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem; z-index: 70; max-width: calc(100% - 32px); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
+/* ---- Safety notice in the boot screen's arcade style (readable: sentence case, no glitches on the warning, nothing flashes) ---- */
+.screen[data-screen="welcome"] { font-family: "VT323", "IBM Plex Mono", ui-monospace, monospace; color: #c8f7d4; font-size: 22px; line-height: 1.18; letter-spacing: 0.02em; gap: 16px; }
+.screen[data-screen="welcome"]::before { content: ""; position: fixed; inset: 0; z-index: -1; background: radial-gradient(ellipse at center, #07090b 55%, #000 100%); }
+.screen[data-screen="welcome"]::after { content: ""; position: fixed; inset: 0; z-index: 60; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.26) 2px 3px), radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.5) 100%); }
+.screen[data-screen="welcome"] .rhdr { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #7ff3ff; text-shadow: 0 0 6px rgba(127,243,255,0.45); font-size: 21px; }
+.screen[data-screen="welcome"] .hazard { height: 12px; background: repeating-linear-gradient(-45deg, #ffd257 0 12px, #0b0b0b 12px 24px); opacity: 0.85; margin-top: -6px; }
+.screen[data-screen="welcome"] h1 { font-family: "VT323", ui-monospace, monospace; font-weight: 400; font-size: clamp(2.1rem, 11vw, 4.6rem); line-height: 0.95; letter-spacing: 0.03em; margin: 4px 0 6px; overflow-wrap: anywhere;
+  color: #c8f7d4; text-shadow: 0 0 10px rgba(127,243,255,0.35), 0 0 2px rgba(200,247,212,0.8); text-transform: uppercase; }
+.screen[data-screen="welcome"] h1 span { color: #ff6b5e; text-shadow: 0 0 10px rgba(255,107,94,0.5); }
+.screen[data-screen="welcome"] h1.glitch { transform: translateX(var(--gx, 3px)); text-shadow: -2px 0 rgba(255,60,60,0.55), 2px 0 rgba(60,220,255,0.55); }
+.screen[data-screen="welcome"] .lede { font-size: 22px; color: #c8f7d4; text-shadow: 0 0 5px rgba(200,247,212,0.25); }
+.screen[data-screen="welcome"] .warning { border: 4px double #ffd257; border-radius: 0; background: rgba(255,210,87,0.04); padding: 14px 16px; gap: 10px; box-shadow: 0 0 18px rgba(255,210,87,0.08) inset; }
+.screen[data-screen="welcome"] .warning h2 { font-family: "VT323", ui-monospace, monospace; font-weight: 400; font-size: 26px; letter-spacing: 0.08em; color: #ffd257; text-shadow: 0 0 8px rgba(255,210,87,0.5); }
+.screen[data-screen="welcome"] .warning h2::before { content: "!! "; } .screen[data-screen="welcome"] .warning h2::after { content: " !!"; }
+.screen[data-screen="welcome"] .warning p { font-size: 21px; color: #f3ead0; }
+.screen[data-screen="welcome"] .consent { font-size: 21px; color: #c8f7d4; align-items: center; gap: 12px; }
+.screen[data-screen="welcome"] .consent input { appearance: none; -webkit-appearance: none; width: 28px; height: 28px; margin: 0; border: 2px solid #6dff9a; background: transparent;
+  display: grid; place-items: center; cursor: pointer; box-shadow: 0 0 8px rgba(109,255,154,0.35); }
+.screen[data-screen="welcome"] .consent input::after { content: "X"; font-family: "VT323", monospace; font-size: 26px; line-height: 1; color: #6dff9a; text-shadow: 0 0 8px rgba(109,255,154,0.7); opacity: 0; }
+.screen[data-screen="welcome"] .consent input:checked::after { opacity: 1; }
+.screen[data-screen="welcome"] .consent input:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.screen[data-screen="welcome"] .foot { background: linear-gradient(to top, #050608 75%, transparent); }
+.screen[data-screen="welcome"] #agree { font-family: "VT323", ui-monospace, monospace; font-weight: 400; font-size: 30px; letter-spacing: 0.08em; text-transform: uppercase;
+  background: rgba(109,255,154,0.06); color: #6dff9a; border: 2px solid #6dff9a; border-radius: 0; padding: 12px; text-shadow: 0 0 8px rgba(109,255,154,0.6); box-shadow: 0 0 14px rgba(109,255,154,0.25); }
+.screen[data-screen="welcome"] #agree:disabled { color: rgba(200,247,212,0.35); border-color: rgba(200,247,212,0.25); background: transparent; text-shadow: none; box-shadow: none; cursor: not-allowed; }
+.screen[data-screen="welcome"] #agree:not(:disabled):hover { background: rgba(109,255,154,0.14); }
+.screen[data-screen="welcome"] #agree:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.screen[data-screen="welcome"] > * { min-width: 0; }
+@media (max-width: 520px) { .screen[data-screen="welcome"], .screen[data-screen="welcome"] .lede, .screen[data-screen="welcome"] .warning p, .screen[data-screen="welcome"] .consent { font-size: 19px; }
+  .screen[data-screen="welcome"] .warning h2 { font-size: 22px; letter-spacing: 0.04em; } .screen[data-screen="welcome"] .rhdr { font-size: 18px; } .screen[data-screen="welcome"] #agree { font-size: 26px; } }
+
 /* ---- Boot: arcade-style hardware check, shown every time the app opens ----
    It comes before the seizure warning, so nothing here flashes: glitches are small, dim and at most ~2 a second. */
 #boot { position: fixed; inset: 0; z-index: 100; background: #050608; color: #c8f7d4; overflow: auto; cursor: pointer;
@@ -225,6 +257,8 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
 
 <main class="app">
   <section class="screen" data-screen="welcome" aria-labelledby="h-welcome">
+    <div class="rhdr" aria-hidden="true"><span>SAFETY NOTICE</span><span>READ BEFORE PLAY</span></div>
+    <div class="hazard" aria-hidden="true"></div>
     <div class="hero">
       <h1 id="h-welcome">Ganz<span>flicker</span></h1>
       <p class="lede">Put the headset on, close your eyes, and let a full-field flicker shine through your eyelids. At the right rate, most people start seeing colors, geometric patterns, and sometimes whole scenes.</p>
@@ -232,7 +266,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
     <section class="warning" aria-labelledby="warn-h">
     <h2 id="warn-h">Read this first</h2>
     <p>Flashing light in the 3–30 Hz range can trigger seizures in people with photosensitive epilepsy, including people who have never had one before. Don't use this if you or close family have epilepsy or seizures, if you've had migraines triggered by light, or if you're tired, drunk, or high.</p>
-    <p>Stop right away if you feel dizzy, nauseous, get a headache, notice muscle twitching, or feel confused. Pressing any controller button or tapping the screen stops the flicker instantly. Have someone nearby the first time.</p>
+    <p>Stop right away if you feel dizzy, nauseous, get a headache, notice muscle twitching, or feel confused. Pressing any controller button, or double-tapping the screen, stops the flicker instantly. Have someone nearby the first time.</p>
     <label class="consent"><input type="checkbox" id="consent"> I've read this and none of it applies to me.</label>
   </section>
     <div class="foot">
@@ -4501,6 +4535,15 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     window.removeEventListener('keydown', onKey);
   }
   const onKey = e => { if (e.key === 'Tab') return; proceed(); };
+  // the safety notice's title gets the same small, occasional glitch (never the warning text itself)
+  if (!reduce) (function titleGlitch() {
+    const t = document.getElementById('h-welcome'), scr = t && t.closest('.screen');
+    if (t && scr && !scr.hidden && !document.getElementById('boot')) {
+      t.style.setProperty('--gx', (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 3)) + 'px');
+      t.classList.add('glitch'); setTimeout(() => t.classList.remove('glitch'), 100 + Math.random() * 80);
+    }
+    if (!scr || !scr.dataset.left) setTimeout(titleGlitch, 1400 + Math.random() * 2200);
+  })();
   boot.addEventListener('pointerdown', proceed);
   window.addEventListener('keydown', onKey);
   run();
