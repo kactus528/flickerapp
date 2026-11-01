@@ -481,6 +481,10 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
       </div>
 
       <label class="toggle"><input type="checkbox" data-key="spectrum"> Rainbow steps (each flash is the next color: red, orange, yellow, green, blue, indigo, violet)</label>
+      <div class="sub" id="spHoldRow" hidden><div class="row">
+        <label for="spHold">Each color lasts <output data-for="spHold"></output></label>
+        <input type="range" id="spHold" data-key="spHold" min="0" max="5" step="0.25">
+      </div><p class="note">Colors always change at the start of a flash, never partway through one, so every color shows for whole flashes.</p></div>
       <p class="note" id="spectrumNote" hidden>Fast changes between saturated colors can trigger seizures in people who are sensitive, even more than plain flicker. It unlocks after you finish another flicker journey of at least 5 minutes and confirm flicker hasn't caused you any problems.</p>
       <label class="toggle"><input type="checkbox" data-key="cj"> Color journey (flash color slowly drifts through a palette)</label>
       <div class="sub" id="cjRows">
@@ -1138,7 +1142,7 @@ const DEFAULTS = {
   flash: '#ffffff', off: '#000000', bright: 70,
   pattern: 'full', pspeed: 1, pscale: 5, pdepth: 0.5, split: 'both', splitColor: '#3366ff',
   dot: false, dotSize: 0.3, dotColor: '#000000', dotMode: 'steady',
-  iso: false, bin: false, mono: false, pitch: 200, toneVol: 40, spectrum: false,
+  iso: false, bin: false, mono: false, pitch: 200, toneVol: 40, spectrum: false, spHold: 0,
   bgOn: false, bg: 'rain', bgVol: 30, bgSwell: true, bgSwellSec: 10,
   drumOn: false, drumRate: 4.5, drumSync: false, drumVol: 60,
   affOn: false, affWhen: 'whole', affFade: false, affGap: 6, affVol: 80,
@@ -1221,7 +1225,7 @@ const FMT = {
   bgSwellSec: v => v + ' s',
   drumRate: v => v + ' beats/s', drumVol: v => v + '%',
   breathRounds: v => v + ` (about ${fmtMinSec(v * breathCycle(state))})`, breathSec: v => v + ' s', breathVol: v => v + '%',
-  pitch: v => v + ' Hz', pspeed: v => v + '×', pscale: v => v <= 3 ? 'wide' : v >= 9 ? 'tight' : v + ' rings', pdepth: v => Math.round(v * 100) + '%', dotSize: v => v + '°', affGap: v => v + ' s'
+  pitch: v => v + ' Hz', pspeed: v => v + '×', pscale: v => v <= 3 ? 'wide' : v >= 9 ? 'tight' : v + ' rings', pdepth: v => Math.round(v * 100) + '%', spHold: v => v > 0 ? v + ' s' : 'one flash', dotSize: v => v + '°', affGap: v => v + ' s'
 };
 function fmtMinSec(s) { const m = Math.floor(s / 60), r = Math.round(s % 60); return m ? (r ? `${m} min ${r} s` : `${m} min`) : `${r} s`; }
 const parseV = v => (v !== '' && !isNaN(v)) ? Number(v) : v;
@@ -1239,7 +1243,7 @@ function describe(c, withBreath = true) {
   if (c.drift) parts.push('drift');
   if (c.lock) parts.push('frame-locked');
   if (!c.spectrum) parts.push(c.cj ? (PALETTES[c.palette]?.name || 'Color') + ' journey' : colorName(c.flash));
-  if (c.spectrum) parts.push('rainbow steps');
+  if (c.spectrum) parts.push(c.spHold > 0 ? `rainbow steps (${c.spHold} s each)` : 'rainbow steps');
   if (c.pattern !== 'full') parts.push({ spiral: 'spiral', rings: 'radial pulse', tunnel: 'tunnel', ripples: 'ripples', crisp: 'layered rings' }[c.pattern]);
   if (c.split === 'alt') parts.push('alternate eyes'); else if (c.split === 'colors') parts.push('two-color eyes');
   if (c.iso) parts.push('isochronic');
@@ -1298,6 +1302,7 @@ function syncUI() {
   show('#dotRows', state.dot);
   show('#toneRows', state.iso || state.bin || state.mono);
   show('#spectrumNote', state.spectrum);
+  show('#spHoldRow', state.spectrum);
   show('#lockRows', state.lock);
   show('#breathRows', state.breathOn);
   show('#b_breathRows', state.breathOn);
@@ -2249,7 +2254,12 @@ function createSession(mode, override) {
       on = phase < 0.5;
     }
     // Frequency following: tell the tone processor exactly when this flash will be on screen, in audio-clock time.
-    if (on && !S.prevOn && t >= 0) S.flashN = (S.flashN || 0) + 1;   // flash counter (rainbow steps)
+    if (on && !S.prevOn && t >= 0) {   // a new flash starts: count it and pick its rainbow color
+      S.flashN = (S.flashN || 0) + 1;
+      // Rainbow steps: by default every flash is the next color. With a hold time, the color advances only at the
+      // first flash after each hold period ends, so a color never changes partway through a flash.
+      S.spIdx = cfg.spHold > 0 ? Math.floor(t / cfg.spHold) : S.flashN - 1;
+    }
     if (on && !S.prevOn && A.follow && t >= 0 && nowMs - (S.lastSync || -1e9) > 240) {   // a few timing updates a second is plenty
       S.lastSync = nowMs;
       try {
@@ -2412,7 +2422,7 @@ function createSession(mode, override) {
     const symK = Math.max(cfg.bright / 100, 0.55);
     const sym = guide > 0.001 ? { col: flashAt(0).map(v => v * symK), b: bshape, g: guide, prog, side } : null;
     // Rainbow steps: each new flash takes the next color of the spectrum, at full saturation.
-    const fl = (cfg.spectrum ? SPECTRUM[((S.flashN || 1) - 1) % 7] : flashAt(Math.max(0, t))).map(v => v * k), of = offRGB.map(v => v * k);
+    const fl = (cfg.spectrum ? SPECTRUM[(S.spIdx || 0) % 7] : flashAt(Math.max(0, t))).map(v => v * k), of = offRGB.map(v => v * k);
     const dotShown = cfg.dot && light > 0.002 && (cfg.dotMode === 'steady' || (cfg.dotMode === 'with') === on);
     const dk = Math.max(cfg.bright / 100, 0.3) * Math.max(light, 0.3);
     return {
