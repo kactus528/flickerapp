@@ -167,8 +167,55 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
 #stage .hint { position: absolute; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); text-align: center; font-family: var(--mono); font-size: 13px; color: #555; mix-blend-mode: difference; pointer-events: none; transition: opacity 0.6s; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem; z-index: 70; max-width: calc(100% - 32px); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---- Boot: arcade-style hardware check, shown every time the app opens ----
+   It comes before the seizure warning, so nothing here flashes: glitches are small, dim and at most ~2 a second. */
+#boot { position: fixed; inset: 0; z-index: 100; background: #050608; color: #c8f7d4; overflow: auto; cursor: pointer;
+  font-family: "VT323", "IBM Plex Mono", ui-monospace, monospace; font-size: 21px; line-height: 1.12; letter-spacing: 0.02em;
+  padding: max(18px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px));
+  transition: opacity 0.45s; }
+#boot.out { opacity: 0; pointer-events: none; }
+#boot::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.28) 2px 3px),
+              radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%); }
+#boot .wrap { max-width: 680px; margin: 0 auto; position: relative; }
+#boot .hdr { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #7ff3ff; text-shadow: 0 0 6px rgba(127,243,255,0.45); }
+#boot .bars { display: grid; grid-template-columns: repeat(8, 1fr); height: 14px; margin: 10px 0 6px; opacity: 0.75; }
+#boot .bars i:nth-child(1) { background: #d8d8d8; } #boot .bars i:nth-child(2) { background: #d8d800; } #boot .bars i:nth-child(3) { background: #00d8d8; }
+#boot .bars i:nth-child(4) { background: #00d800; } #boot .bars i:nth-child(5) { background: #d800d8; } #boot .bars i:nth-child(6) { background: #d80000; }
+#boot .bars i:nth-child(7) { background: #0000d8; } #boot .bars i:nth-child(8) { background: #101010; }
+#boot .grid { height: 46px; margin-bottom: 10px; opacity: 0.5;
+  background-image: linear-gradient(rgba(200,247,212,0.55) 1px, transparent 1px), linear-gradient(90deg, rgba(200,247,212,0.55) 1px, transparent 1px);
+  background-size: 23px 23px; border: 1px solid rgba(200,247,212,0.55); }
+#boot .bl { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; text-shadow: 0 0 5px rgba(200,247,212,0.35); min-height: 1.12em; }
+#boot .bl .k { flex: none; }
+#boot .bl .d { flex: 1; overflow: hidden; color: rgba(200,247,212,0.35); }
+#boot .bl .d::before { content: " . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ."; }
+#boot .bl .v { flex: none; max-width: 62%; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+#boot .ok { color: #6dff9a; text-shadow: 0 0 6px rgba(109,255,154,0.5); }
+#boot .warn { color: #ffd257; text-shadow: 0 0 6px rgba(255,210,87,0.45); }
+#boot .bad { color: #ff6b5e; text-shadow: 0 0 6px rgba(255,107,94,0.45); }
+#boot .dim { color: rgba(200,247,212,0.55); }
+#boot .sec { color: #7ff3ff; margin-top: 8px; text-shadow: 0 0 6px rgba(127,243,255,0.45); }
+#boot .verdict { margin-top: 12px; }
+#boot .press { margin-top: 14px; text-align: center; color: #fff; animation: bootBlink 1.2s steps(2, jump-none) infinite; }
+@keyframes bootBlink { 50% { opacity: 0.25; } }
+#boot .glitch { transform: translateX(var(--gx, 3px)); text-shadow: -2px 0 rgba(255,60,60,0.55), 2px 0 rgba(60,220,255,0.55); }
+#boot .tear { position: absolute; left: 0; height: 5px; background: rgba(200,247,212,0.16); pointer-events: none; z-index: 1; }
+#boot .cursor::after { content: "█"; animation: bootBlink 1s steps(2, jump-none) infinite; margin-left: 2px; }
+@media (max-width: 520px) { #boot { font-size: 17px; } #boot .bl { flex-wrap: wrap; } #boot .bl .v { max-width: none; white-space: normal; flex: 1 0 auto; text-align: right; } }
+@media (prefers-reduced-motion: reduce) { #boot .press, #boot .cursor::after { animation: none; } }
 </style>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono&family=VT323&display=swap">
+
+<div id="boot" role="dialog" aria-modal="true" aria-label="System check">
+  <div class="wrap">
+    <div class="hdr"><span>GANZFLICKER SYSTEM CHECK</span><span>BOOT ROM V2.6</span></div>
+    <div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="grid" aria-hidden="true"></div>
+    <div id="bootLog" aria-live="polite"></div>
+  </div>
+</div>
 
 <header class="topbar" id="topbar" hidden>
   <button class="iconbtn" id="navBack" type="button" aria-label="Back">←</button>
@@ -4308,4 +4355,154 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
   btn.addEventListener('click', () => Lobby.enter());
 })();
 </script>
+<script>
+// ================= Boot: arcade-style system check =================
+// Runs real tests of what the app needs (GPU and shader precision, refresh rate and frame-timing stability, exact flicker
+// rates, VR, audio and the phase-locked tone engine, microphone, storage, battery...) and prints them like 80s/90s arcade
+// service mode. Tap during the check to skip ahead; tap again to continue to the safety notice.
+(() => {
+  const boot = document.getElementById('boot'), log = document.getElementById('bootLog');
+  if (!boot) return;
+  if (/[?&]noboot\b/.test(location.search)) { boot.remove(); return; }   // for testing
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const HW = window.HW = {};
+  const sleep = ms => new Promise(r => setTimeout(r, reduce ? 0 : ms));
+  let fast = false, done = false;
 
+  // ---------- probes (start together, print in order) ----------
+  const probeGPU = () => {
+    try {
+      const c = document.createElement('canvas'); const g2 = c.getContext('webgl2'); const g = g2 || c.getContext('webgl');
+      if (!g) return { ok: false };
+      const ext = g.getExtension('WEBGL_debug_renderer_info');
+      const r = { ok: true, v: g2 ? '2.0' : '1.0', renderer: String(ext ? g.getParameter(ext.UNMASKED_RENDERER_WEBGL) : g.getParameter(g.RENDERER)),
+        highp: (g.getShaderPrecisionFormat(g.FRAGMENT_SHADER, g.HIGH_FLOAT) || {}).precision > 0, maxTex: g.getParameter(g.MAX_TEXTURE_SIZE) };
+      g.getExtension('WEBGL_lose_context')?.loseContext(); return r;
+    } catch { return { ok: false }; }
+  };
+  const probeRefresh = () => new Promise(res => {
+    const ts = []; const step = t => { ts.push(t); if (ts.length < 75) requestAnimationFrame(step); else {
+      const d = ts.slice(5).map((t, i, a) => i ? t - a[i - 1] : null).filter(x => x !== null && x > 2 && x < 60).sort((a, b) => a - b);
+      if (d.length < 10) return res(null);
+      const med = d[Math.floor(d.length / 2)], raw = 1000 / med;
+      const snap = [60, 72, 75, 80, 90, 100, 120, 144, 165].find(k => Math.abs(k - raw) / k < 0.04) || Math.round(raw);
+      const mid = d.slice(Math.floor(d.length * 0.1), Math.ceil(d.length * 0.9)), mu = mid.reduce((a, b) => a + b, 0) / mid.length;
+      const sd = Math.sqrt(mid.reduce((a, b) => a + (b - mu) ** 2, 0) / mid.length);
+      const late = d.filter(x => x > med * 1.5).length;
+      res({ hz: snap, raw, sd, late, n: d.length });
+    } };
+    requestAnimationFrame(step);
+    setTimeout(() => res(null), 4000);
+  });
+  const probeAudio = () => {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return { ok: false };
+      const c = new AC(); const r = { ok: true, sr: c.sampleRate, ch: c.destination.maxChannelCount, worklet: !!c.audioWorklet, lat: c.baseLatency };
+      c.close?.(); return r;
+    } catch { return { ok: false }; }
+  };
+  const probeClock = () => { let min = Infinity, a = performance.now(); for (let i = 0; i < 20000; i++) { const b = performance.now(); if (b > a) { min = Math.min(min, b - a); a = b; } } return min; };
+  const P = {
+    gpu: Promise.resolve(probeGPU()),
+    refresh: probeRefresh(),
+    xr: navigator.xr && navigator.xr.isSessionSupported ? navigator.xr.isSessionSupported('immersive-vr').catch(() => false) : Promise.resolve(false),
+    audio: Promise.resolve(probeAudio()),
+    mic: (typeof micPermission === 'function' ? micPermission() : Promise.resolve('unknown')).catch(() => 'unknown'),
+    storage: navigator.storage && navigator.storage.estimate ? navigator.storage.estimate().catch(() => null) : Promise.resolve(null),
+    journal: (typeof dbAll === 'function' ? dbAll('sessions').then(a => a.length) : Promise.resolve(null)).catch(() => null),
+    battery: navigator.getBattery ? navigator.getBattery().catch(() => null) : Promise.resolve(null),
+    clock: Promise.resolve(probeClock())
+  };
+
+  // ---------- printing ----------
+  const line = (k, cls = '') => { const el = document.createElement('div'); el.className = 'bl ' + cls; el.innerHTML = '<span class="k"></span><span class="d"></span><span class="v"></span>';
+    el.querySelector('.k').textContent = k; log.append(el); boot.scrollTop = boot.scrollHeight; return el; };
+  const set = (el, v, st) => { const s = el.querySelector('.v'); s.textContent = v; s.className = 'v ' + (st || ''); };
+  const text = (t, cls) => { const el = document.createElement('div'); el.className = cls; el.textContent = t; log.append(el); boot.scrollTop = boot.scrollHeight; return el; };
+  let warns = 0, bads = 0;
+  async function row(k, promise, fmt) {
+    const el = line(k); el.querySelector('.v').classList.add('cursor');
+    await sleep(fast ? 0 : 70 + Math.random() * 110);
+    let r; try { r = await promise; } catch { r = null; }
+    const [v, st] = fmt(r); if (st === 'warn') warns++; if (st === 'bad') bads++;
+    // brief scrambled readout before the value settles (small and dim: no flashing)
+    if (!fast && !reduce) { const s = el.querySelector('.v'); s.classList.remove('cursor'); for (let i = 0; i < 3; i++) { s.textContent = v.replace(/[^\s]/g, () => '▓▒░#%$@&*'[Math.floor(Math.random() * 9)]); await sleep(35); } }
+    set(el, v, st);
+  }
+  const up = s => String(s).toUpperCase();
+
+  async function run() {
+    text('ROM CHECK ................. OK   WORK RAM 000000-0FFFFF OK', 'dim');
+    text('— PROCESSOR & GRAPHICS —', 'sec');
+    await row('CPU', Promise.resolve(navigator.hardwareConcurrency), n => n ? [`${n} CORES`, 'ok'] : ['UNKNOWN', 'dim']);
+    await row('MEMORY', Promise.resolve(navigator.deviceMemory), m => m ? [`${m} GB${m >= 8 ? '+' : ''}`, m >= 4 ? 'ok' : 'warn'] : ['HIDDEN BY BROWSER', 'dim']);
+    await row('GPU', P.gpu, g => g && g.ok ? [up(g.renderer).replace(/ANGLE \(|\)$/g, '').slice(0, 34), 'ok'] : ['NO WEBGL', 'bad']);
+    await row('WEBGL', P.gpu, g => g && g.ok ? [`${g.v}  TEX ${g.maxTex}`, 'ok'] : ['UNAVAILABLE', 'bad']);
+    await row('SHADER PRECISION', P.gpu, g => g && g.ok ? (g.highp ? ['HIGHP OK', 'ok'] : ['MEDIUMP · STATIC GRAIN COARSER', 'warn']) : ['—', 'bad']);
+    text('— DISPLAY & TIMING —', 'sec');
+    await row('SCREEN', Promise.resolve(1), () => [`${Math.round(screen.width * devicePixelRatio)}x${Math.round(screen.height * devicePixelRatio)} @${(+devicePixelRatio).toFixed(1)}X`, 'ok']);
+    await row('REFRESH RATE', P.refresh, r => r ? [`${r.hz} HZ`, 'ok'] : ['NOT MEASURED', 'warn']);
+    await row('FRAME TIMING', P.refresh, r => r ? [`±${r.sd.toFixed(2)} MS${r.late ? ` · ${r.late} LATE` : ''}  ${r.sd < 1 && r.late <= 2 ? 'STABLE' : 'UNSTEADY'}`, r.sd < 1 && r.late <= 2 ? 'ok' : 'warn'] : ['—', 'warn']);
+    await row('FLICKER 10 HZ', P.refresh, r => { if (!r || typeof exact !== 'function') return ['—', 'dim']; const e = exact(10, r.hz);
+      return Math.abs(e.hz - 10) < 0.01 ? [`${e.n} FRAMES/CYCLE · EXACT`, 'ok'] : [`${e.n} FRAMES · ${e.hz.toFixed(2)} HZ`, 'warn']; });
+    await row('FLICKER 40 HZ', P.refresh, r => { if (!r || typeof exact !== 'function') return ['—', 'dim']; const e = exact(40, r.hz);
+      return Math.abs(e.hz - 40) < 0.01 ? [`${e.n} FRAMES/CYCLE · EXACT`, 'ok'] : [`RUNS AT ${e.hz.toFixed(0)} HZ HERE · EXACT AT 120`, 'dim']; });
+    await row('CLOCK RESOLUTION', P.clock, c => isFinite(c) ? [`${c < 0.01 ? '<0.01' : c.toFixed(2)} MS`, c <= 1 ? 'ok' : 'warn'] : ['—', 'dim']);
+    text('— VR & SOUND —', 'sec');
+    await row('VR HEADSET', P.xr, x => x ? ['IMMERSIVE-VR READY', 'ok'] : ['NOT DETECTED · FULLSCREEN ONLY', 'dim']);
+    await row('AUDIO', P.audio, a => a && a.ok ? [`${(a.sr / 1000).toFixed(1)} KHZ · ${a.ch >= 2 ? 'STEREO' : 'MONO'}`, a.ch >= 2 ? 'ok' : 'warn'] : ['NO AUDIO', 'bad']);
+    await row('BINAURAL BEATS', P.audio, a => a && a.ok && a.ch >= 2 ? ['L/R SEPARATE · OK', 'ok'] : ['NEEDS STEREO', 'warn']);
+    await row('TONE ENGINE', P.audio, a => a && a.worklet ? (location.protocol === 'file:' ? ['FALLBACK (OPENED AS FILE)', 'warn'] : ['PHASE-LOCKED READY', 'ok']) : ['BASIC TONES', 'warn']);
+    await row('MICROPHONE', P.mic, m => m === 'granted' ? ['ALLOWED', 'ok'] : m === 'denied' ? ['BLOCKED', 'warn'] : ['ASKS WHEN NEEDED', 'dim']);
+    text('— SYSTEM —', 'sec');
+    await row('JOURNAL STORAGE', Promise.all([P.journal, P.storage]), ([n, s]) => n === null ? ['UNAVAILABLE', 'warn']
+      : [`${n} ENTR${n === 1 ? 'Y' : 'IES'}${s && s.quota ? ` · ${Math.max(0, (s.quota - (s.usage || 0)) / 1e9).toFixed(1)} GB FREE` : ''}`, 'ok']);
+    await row('SCREEN WAKE LOCK', Promise.resolve('wakeLock' in navigator), w => w ? ['OK', 'ok'] : ['N/A · KEEP SCREEN ON', 'dim']);
+    await row('FULLSCREEN', Promise.resolve(document.fullscreenEnabled), f => f ? ['OK', 'ok'] : ['N/A', 'dim']);
+    await row('BATTERY', P.battery, b => b ? [`${Math.round(b.level * 100)}%${b.charging ? ' · CHARGING' : ''}`, b.level < 0.2 && !b.charging ? 'warn' : 'ok'] : ['N/A', 'dim']);
+    await row('NETWORK', Promise.resolve(navigator.onLine), o => o ? ['ONLINE', 'ok'] : ['OFFLINE · OK', 'dim']);
+    Object.assign(HW, { refresh: (await P.refresh)?.hz || null, xr: await P.xr, gpu: (await P.gpu)?.renderer || null });
+    await sleep(120);
+    const v = text(bads ? `SYSTEM CHECK: ${bads} FAULT${bads > 1 ? 'S' : ''} · ${warns} NOTE${warns === 1 ? '' : 'S'}` : warns ? `SYSTEM READY · ${warns} NOTE${warns === 1 ? '' : 'S'}` : 'ALL SYSTEMS NOMINAL', 'verdict ' + (bads ? 'bad' : warns ? 'warn' : 'ok'));
+    text('NEXT: SAFETY NOTICE', 'dim');
+    text(matchMedia('(pointer: coarse)').matches ? 'TAP TO CONTINUE' : 'PRESS ANY KEY', 'press');
+    done = true;
+  }
+
+  // ---------- small, dim glitches (never a full-screen flash) ----------
+  let gTimer = null;
+  function glitch() {
+    if (!boot.isConnected || boot.classList.contains('out')) return;
+    const rows = log.querySelectorAll('.bl, .dim, .sec');
+    if (rows.length && Math.random() < 0.7) {
+      const el = rows[Math.floor(Math.random() * rows.length)];
+      el.style.setProperty('--gx', (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 4)) + 'px');
+      el.classList.add('glitch'); setTimeout(() => el.classList.remove('glitch'), 90 + Math.random() * 90);
+    } else {
+      const t = document.createElement('div'); t.className = 'tear';
+      t.style.top = Math.floor(Math.random() * Math.max(80, log.offsetHeight + 120)) + 'px'; t.style.width = (20 + Math.random() * 50) + '%';
+      t.style.left = Math.random() * 40 + '%'; boot.querySelector('.wrap').append(t); setTimeout(() => t.remove(), 110);
+    }
+    gTimer = setTimeout(glitch, 450 + Math.random() * 900);   // at most ~2 small events a second
+  }
+  if (!reduce) gTimer = setTimeout(glitch, 600);
+
+  // ---------- continue ----------
+  function blip() {   // tiny arcade "coin" sound on continue (allowed: it follows a tap)
+    try { const AC = window.AudioContext || window.webkitAudioContext; const c = new AC(), o = c.createOscillator(), g = c.createGain(), t = c.currentTime;
+      o.type = 'square'; o.frequency.setValueAtTime(988, t); o.frequency.setValueAtTime(1319, t + 0.07);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.06, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.3); setTimeout(() => c.close?.(), 600); } catch {}
+  }
+  function proceed() {
+    if (!done) { fast = true; return; }   // first tap: finish printing now
+    clearTimeout(gTimer); blip(); boot.classList.add('out');
+    setTimeout(() => boot.remove(), 500);
+    window.removeEventListener('keydown', onKey);
+  }
+  const onKey = e => { if (e.key === 'Tab') return; proceed(); };
+  boot.addEventListener('pointerdown', proceed);
+  window.addEventListener('keydown', onKey);
+  run();
+})();
+</script>
