@@ -1479,8 +1479,8 @@ const RESEARCH = [
     cfg: { ...BASE, rhythm: 'stairs', gStart: 12, gEnd: 4.5, gMin: 20, mins: 25, flash: '#ff991a', bright: 55, bin: true, mono: true, iso: false, pitch: 180, toneVol: 30,
            bgOn: true, bg: 'pink', bgVol: 35, bgSwell: false, breathOn: true, breathRounds: 6, breathSec: 4, breathVol: 40 } },
   { name: 'Gamma 40', time: '~22 min',
-    why: 'Inspired by 40 Hz gamma research, where light and sound pulsing together at 40 Hz drive the brain\'s strongest rhythmic response. A fast, soft shimmer rather than visions: an alert, focused session. Steady 40 Hz light with 40 Hz pulses and a monaural beat locked to every flash. Exactly 40 Hz needs the headset at 120 Hz; at 90 Hz it runs at 45 Hz.',
-    cfg: { ...BASE, hz: 40, flash: '#ffffff', bright: 45, mins: 20, iso: true, mono: true, bin: false, pitch: 320, toneVol: 30,
+    why: 'Inspired by 40 Hz gamma research, where light and sound pulsing together at 40 Hz drive the brain\'s strongest rhythmic response. Eyes open: at this speed eyelids blur the light into plain gray, so rest your gaze on the small dot instead. A fast, soft shimmer rather than visions: an alert, focused session. Steady 40 Hz light with 40 Hz pulses and a monaural beat locked to every flash. Exactly 40 Hz needs the headset at 120 Hz; at 90 Hz it runs at 45 Hz.',
+    cfg: { ...BASE, hz: 40, flash: '#ffffff', bright: 45, mins: 20, iso: true, mono: true, bin: false, pitch: 320, toneVol: 30, dot: true, dotSize: 0.35, dotColor: '#000000', dotMode: 'steady',
            bgOn: true, bg: 'pink', bgVol: 20, bgSwell: false, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40 } },
   { name: 'Drum-locked journey', time: '~22 min',
     why: 'Steady drumming helped experienced practitioners turn inward in brain-scan research. Here the drum strikes on every second flash (5 beats a second at 10 Hz), so sound and light share one rhythm.',
@@ -2202,7 +2202,13 @@ function createSession(mode, override) {
       if (!L.N) L.N = exact(hz, refresh).n;
       on = L.k < Math.round(L.N / 2);
       hz = refresh / L.N;
-      L.k += Math.max(1, Math.round(dt * refresh));   // a dropped frame still occupied its slot on screen
+      // One step per drawn frame, always. Timestamps jitter, and "catching up" after a late frame adds a second visible
+      // hiccup on top of the one the headset already shows (it repeats the last image). At 1-on-1-off (45 Hz) that's a
+      // stutter. The tones re-sync to the flashes themselves, so the light doesn't need to chase wall-clock time.
+      L.k += 1;
+      // Count truly late frames for the journal. Timestamp jitter makes one gap long and the next short, so judge pairs:
+      // two gaps adding up to more than 2.75 frames means a frame really was missed.
+      const fr = dt * refresh; if (L.prevFr !== undefined && L.prevFr + fr > 2.75 && Math.max(L.prevFr, fr) > 1.5) { S.drops = (S.drops || 0) + 1; L.prevFr = undefined; } else L.prevFr = fr;
       while (L.k >= L.N) { L.k -= L.N; L.N = exact(frequencyAt(t), refresh).n; }
     } else {
       phase = (phase + hz * dt) % 1;
@@ -2210,7 +2216,8 @@ function createSession(mode, override) {
     }
     // Frequency following: tell the tone processor exactly when this flash will be on screen, in audio-clock time.
     if (on && !S.prevOn && t >= 0) S.flashN = (S.flashN || 0) + 1;   // flash counter (rainbow steps)
-    if (on && !S.prevOn && A.follow && t >= 0) {
+    if (on && !S.prevOn && A.follow && t >= 0 && nowMs - (S.lastSync || -1e9) > 240) {   // a few timing updates a second is plenty
+      S.lastSync = nowMs;
       try {
         const ts = A.ctx.getOutputTimestamp ? A.ctx.getOutputTimestamp() : null, shown = nowMs + 1000 / (refresh || 60);
         const tAudio = ts && ts.performanceTime > 0 ? ts.contextTime + (shown - ts.performanceTime) / 1000 : A.ctx.currentTime + (A.ctx.outputLatency || 0.02);
@@ -2916,7 +2923,7 @@ async function logEntry(S, reason) {
   const secs = Math.round(Math.min(S.T, S.total));
   if (secs < 5) return null;
   const entry = { id: S.startedAt.getTime(), date: S.startedAt.toISOString(), secs, planned: S.cfg.mins, mode: S.mode,
-    reason: reason === 'finished' ? 'finished' : 'stopped early', cfg: S.cfg, refresh: S.refresh || null, rating: 0, note: '', voice: null };
+    reason: reason === 'finished' ? 'finished' : 'stopped early', cfg: S.cfg, refresh: S.refresh || null, rating: 0, note: '', voice: null, drops: S.drops || 0 };
   if (S.dojo) entry.dojo = S.dojoSummary();
   await dbPut('sessions', entry);
   renderHistory();
@@ -2992,7 +2999,7 @@ async function renderHistory() {
     const top = document.createElement('div'); top.className = 'entry-top';
     const dt = document.createElement('span'); dt.className = 'entry-date'; dt.textContent = fmtDate(e.date);
     const meta = document.createElement('span'); meta.className = 'entry-meta';
-    meta.textContent = `${fmtDur(e.secs)} · ${e.mode === 'vr' ? 'VR' : 'fullscreen'}${e.refresh ? ' ' + Math.round(e.refresh) + ' Hz' : ''} · ${e.reason}`;
+    meta.textContent = `${fmtDur(e.secs)} · ${e.mode === 'vr' ? 'VR' : 'fullscreen'}${e.refresh ? ' ' + Math.round(e.refresh) + ' Hz' : ''}${e.drops !== undefined && e.cfg && !e.cfg.kind ? ` · ${e.drops} late frame${e.drops === 1 ? '' : 's'}` : ''} · ${e.reason}`;
     top.append(dt, meta);
     const sum = document.createElement('p'); sum.className = 'entry-sum'; sum.textContent = describe(e.cfg);
     card.append(top, sum);
@@ -3325,7 +3332,7 @@ const Lobby = (() => {
     'Find your frequency': 'Slowly scans 12 → 8 Hz to find your rate.',
     'Drum-locked journey': 'A drum beats in time with the light.',
     'Frequency following': 'Light and beats step down 12 → 4.5 Hz together.',
-    'Gamma 40': 'A fast 40 Hz shimmer with locked pulses.',
+    'Gamma 40': 'Eyes open: a fast 40 Hz shimmer with locked pulses.',
     'Classic Ganzflicker': 'Red flicker from the online studies.',
     'Spectrum': 'Each flash is the next color of the rainbow.'
   };
@@ -3780,7 +3787,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       else if (spLock) {
         text('Fast color changes carry extra seizure risk. Have earlier flicker sessions gone with no problems?', 130, 935, `400 34px ${F.body}`, C.warn);
         pill('spok', PW - 90 - 640 - 30 - 560, 1060, 560, 120, 'Yes, no problems', { size: 44 }, () => { store.set('gf-spectrum-ok', Date.now()); });
-      } else text('Get comfortable, then close your eyes when the light begins. Pull the trigger at any time to stop.', 130, 935, `400 36px ${F.body}`, C.warn);
+      } else text(cfg.dot && cfg.hz >= 30 ? 'Keep your eyes open and rest your gaze on the dot. Pull the trigger at any time to stop.' : 'Get comfortable, then close your eyes when the light begins. Pull the trigger at any time to stop.', 130, 935, `400 36px ${F.body}`, C.warn);
       pill('back', 90, 1060, 300, 120, 'Back', { size: 44 }, () => { L.view = 'journeys'; panelDirty = true; });
       pill('begin', PW - 90 - 640, 1060, 640, 120, 'Begin', { primary: true, disabled: spLock, size: 54 }, () => begin());
     } else if (L.view === 'results') {
@@ -4290,7 +4297,7 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     const showPanel = mode === 'menu' || mode === 'fadein';
     if (amb && sharedAudioCtx) {
       ramp(amb.out.gain, ambOn && mode !== 'running' ? 0.55 * fade : 0, sharedAudioCtx.currentTime, 0.3);
-      amb.update(t);
+      if (mode !== 'running') amb.update(t);   // room sounds pause during a session (no background work while the light runs)
     }
     panelAlpha += ((showPanel ? 1 : 0) - panelAlpha) * Math.min(1, dt * 6);
 
