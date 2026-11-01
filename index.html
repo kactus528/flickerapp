@@ -1088,6 +1088,10 @@ const $$ = s => [...document.querySelectorAll(s)];
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const hexRGB = h => [1,3,5].map(i => parseInt(h.slice(i, i+2), 16) / 255);
 const isJourney = c => c.rhythm === 'glide' || c.rhythm === 'stairs';
+// Remember which refresh rates the headset offered to WebXR and what the session got, for the system check.
+function noteVRRates(rates, got, err) {
+  try { localStorage.setItem('gf-vr-rates', JSON.stringify({ rates: rates.map(Math.round), got: got ? Math.round(got) : null, err: err ? String(err.name || err) : null, at: Date.now() })); } catch {}
+}
 // Rainbow steps gate: only after a completed flicker journey (5+ min) and a one-time confirmation of no problems.
 let spectrumEligible = false;
 const spectrumOK = () => spectrumEligible && !!store.get('gf-spectrum-ok');
@@ -2905,8 +2909,8 @@ async function startVR(override) {
     const rates = [...(session.supportedFrameRates || [])];
     if (rates.length) {
       const want = S.cfg.refresh === 'max' || !rates.includes(+S.cfg.refresh) ? Math.max(...rates) : +S.cfg.refresh;
-      session.updateTargetFrameRate(want).catch(() => {});
-    }
+      session.updateTargetFrameRate(want).then(() => noteVRRates(rates, session.frameRate)).catch(e => noteVRRates(rates, session.frameRate, e));
+    } else noteVRRates([], session.frameRate);
   } catch {}
 }
 
@@ -4252,7 +4256,9 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
       catch { refSpace = await xr.requestReferenceSpace('local'); floorY = -1.6; }
       viewerSpace = await xr.requestReferenceSpace('viewer');
       G.skyFor = null; bake(roomOf(roomId));
-      try { const rates = [...(xr.supportedFrameRates || [])]; if (rates.length) xr.updateTargetFrameRate(Math.max(...rates)).catch(() => {}); } catch {}
+      try { const rates = [...(xr.supportedFrameRates || [])];
+        if (rates.length) xr.updateTargetFrameRate(Math.max(...rates)).then(() => noteVRRates(rates, xr.frameRate)).catch(e => noteVRRates(rates, xr.frameRate, e));
+        else noteVRRates([], xr.frameRate); } catch {}
     } catch (e) {
       $('#lobbyNote').textContent = 'The VR lobby couldn\'t start: ' + e.message + '. Send this message to Claude.';
       try { xr.end(); } catch {}
@@ -4485,6 +4491,17 @@ void main(){ float r = length(vQ); float glow = exp(-r*r*5.0)*0.55 + smoothstep(
     await row('CLOCK RESOLUTION', P.clock, c => isFinite(c) ? [`${c < 0.01 ? '<0.01' : c.toFixed(2)} MS`, c <= 1 ? 'ok' : 'warn'] : ['—', 'dim']);
     text('— VR & SOUND —', 'sec');
     await row('VR HEADSET', P.xr, x => x ? ['IMMERSIVE-VR READY', 'ok'] : ['NOT DETECTED · FULLSCREEN ONLY', 'dim']);
+    await row('VR REFRESH', P.xr, x => {
+      let v = null; try { v = JSON.parse(localStorage.getItem('gf-vr-rates')); } catch {}
+      if (!v) return x ? ['RUN A VR SESSION TO MEASURE', 'dim'] : ['—', 'dim'];
+      const offered = v.rates.length ? v.rates.join('/') : 'NOT REPORTED', top = Math.max(0, ...v.rates);
+      return [`${offered}${v.got ? ` · RAN ${v.got} HZ` : ''}`, v.got >= 120 ? 'ok' : top >= 120 ? 'warn' : v.got ? 'warn' : 'dim'];
+    });
+    await row('120 HZ', P.xr, x => {
+      let v = null; try { v = JSON.parse(localStorage.getItem('gf-vr-rates')); } catch {}
+      if (!v || !v.rates.length) return ['UNKNOWN', 'dim'];
+      return v.rates.some(r => r >= 120) ? (v.got >= 120 ? ['ON · GAMMA 40 EXACT', 'ok'] : ['OFFERED · NOT USED', 'warn']) : ['NOT OFFERED TO BROWSER', 'warn'];
+    });
     await row('AUDIO', P.audio, a => a && a.ok ? [`${(a.sr / 1000).toFixed(1)} KHZ · ${a.ch >= 2 ? 'STEREO' : 'MONO'}`, a.ch >= 2 ? 'ok' : 'warn'] : ['NO AUDIO', 'bad']);
     await row('BINAURAL BEATS', P.audio, a => a && a.ok && a.ch >= 2 ? ['L/R SEPARATE · OK', 'ok'] : ['NEEDS STEREO', 'warn']);
     await row('TONE ENGINE', P.audio, a => a && a.worklet ? (location.protocol === 'file:' ? ['FALLBACK (OPENED AS FILE)', 'warn'] : ['PHASE-LOCKED READY', 'ok']) : ['BASIC TONES', 'warn']);
