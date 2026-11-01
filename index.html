@@ -542,6 +542,12 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
             <label for="pscale">Ripple spacing <output data-for="pscale"></output></label>
             <input type="range" id="pscale" data-key="pscale" min="2" max="12" step="1">
           </div>
+          <span class="lbl">Ring direction</span>
+          <div class="presets" data-key="pdir" role="group" aria-label="Ring direction">
+            <button class="chip" data-v="out">Outward</button>
+            <button class="chip" data-v="in">Inward</button>
+            <button class="chip" data-v="both">Both</button>
+          </div>
           <div class="row">
             <label for="pdepth">Ring strength <output data-for="pdepth"></output></label>
             <input type="range" id="pdepth" data-key="pdepth" min="0.05" max="0.8" step="0.05">
@@ -1140,7 +1146,7 @@ const DEFAULTS = {
   rhythm: 'steady', hz: 10, gStart: 12, gEnd: 6, gMin: 8, drift: false, lock: true, refresh: 'max', hzShow: false,
   cj: false, palette: 'sunset', cycle: 3,
   flash: '#ffffff', off: '#000000', bright: 70,
-  pattern: 'full', pspeed: 1, pscale: 5, pdepth: 0.5, split: 'both', splitColor: '#3366ff',
+  pattern: 'full', pspeed: 1, pscale: 5, pdepth: 0.5, pdir: 'out', split: 'both', splitColor: '#3366ff',
   dot: false, dotSize: 0.3, dotColor: '#000000', dotMode: 'steady',
   iso: false, bin: false, mono: false, pitch: 200, toneVol: 40, spectrum: false, spHold: 1,
   bgOn: false, bg: 'rain', bgVol: 30, bgSwell: true, bgSwellSec: 10,
@@ -1519,7 +1525,7 @@ const RESEARCH = [
            dot: true, dotSize: 0.35, dotColor: '#000000', dotMode: 'steady', bgOn: true, bg: 'pink', bgVol: 20, bgSwell: false, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40 } },
   { name: 'Gamma Rings', time: '~22 min',
     why: 'Gamma 40 with three layered sets of crisp circles flowing out from the center at different spacings and speeds, so the pattern looks almost random but never repeats. Shades differ only slightly. Eyes open, gaze on the dot. Adjust spacing, strength and speed under Advanced → Light → Pattern; try it with rainbow steps.',
-    cfg: { ...BASE, hz: 40, flash: '#ffffff', bright: 45, mins: 20, pattern: 'crisp', pspeed: 1, pscale: 6, pdepth: 0.15, iso: true, mono: true, bin: false, pitch: 320, toneVol: 30,
+    cfg: { ...BASE, hz: 40, flash: '#ffffff', bright: 45, mins: 20, pattern: 'crisp', pspeed: 1, pscale: 6, pdepth: 0.15, pdir: 'both', iso: true, mono: true, bin: false, pitch: 320, toneVol: 30,
            dot: true, dotSize: 0.35, dotColor: '#000000', dotMode: 'steady', bgOn: true, bg: 'pink', bgVol: 20, bgSwell: false, breathOn: true, breathRounds: 4, breathSec: 4, breathVol: 40 } },
   { name: 'Drum-locked journey', time: '~22 min',
     why: 'Steady drumming helped experienced practitioners turn inward in brain-scan research. Here the drum strikes on every second flash (5 beats a second at 10 Hz), so sound and light share one rhythm.',
@@ -2441,7 +2447,7 @@ function createSession(mode, override) {
       sym,
       // In the Dojo's Gatekeeper the point briefly fades toward the background: that's the target to respond to.
       dot: dotShown ? { rgb: dotRGB.map((v, i) => v * dk + (of[i] - v * dk) * 0.55 * tdim), deg: cfg.dotSize } : null,
-      pattern: { full: 0, spiral: 1, rings: 2, tunnel: 3, ripples: 4, crisp: 5 }[cfg.pattern], ptime: t * cfg.pspeed, pscale: cfg.pscale, pdepth: Math.min(cfg.pdepth ?? 0.5, cfg.pattern === 'crisp' ? 0.5 : 0.8)
+      pattern: { full: 0, spiral: 1, rings: 2, tunnel: 3, ripples: 4, crisp: 5 }[cfg.pattern], ptime: t * cfg.pspeed, pdir: { out: 0, in: 1, both: 2 }[cfg.pdir] || 0, pscale: cfg.pscale, pdepth: Math.min(cfg.pdepth ?? 0.5, cfg.pattern === 'crisp' ? 0.5 : 0.8)
     };
   };
   // ---- Dojo sounds: synthesized, soft, placed in 3D around you ----
@@ -2537,7 +2543,8 @@ uniform vec3 uSymCol; uniform float uBreath; uniform float uGuide; uniform float
 uniform sampler2D uTxt; uniform float uTxtA;
 uniform float uStat; uniform float uSeed; uniform float uBlur; uniform float uCandle; uniform float uCandleMove;
 uniform vec4 uDis[4]; uniform vec4 uDisC[4];
-uniform float uRing; uniform float uDepth;   // Ripples pattern: rings per radian, strength   // Dojo distractions: (x, y, radius, alpha) and (r, g, b, shape)
+uniform float uRing; uniform float uDepth; uniform float uDir;   // uDir: 0 outward, 1 inward, 2 both
+   // Ripples pattern: rings per radian, strength   // Dojo distractions: (x, y, radius, alpha) and (r, g, b, shape)
 const float TAU = 6.2831853;
 // Hash without sine (Dave Hoskins), stable on mobile GPUs: 0..1 per cell.
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -2568,7 +2575,9 @@ void main(){
   }
   else if (uPat == 4) {
     // Ripples: soft sine-shaped rings flowing outward from the center (no hard edges), at modest contrast.
-    m = 0.5 + 0.5 * sin(TAU * (r * uRing - uT * 0.6));
+    // Inward flips the motion; both adds an outward and an inward wave, which cross through each other.
+    float wo = sin(TAU * (r * uRing - uT * 0.6)), wi = sin(TAU * (r * uRing * 0.83 + uT * 0.6));
+    m = 0.5 + 0.5 * (uDir < 0.5 ? wo : (uDir < 1.5 ? wi : 0.5 * (wo + wi)));
     m = 1.0 - uDepth * (1.0 - m);
   }
   else if (uPat == 5) {
@@ -2578,6 +2587,8 @@ void main(){
     // Edges are anti-aliased over about one screen pixel so they don't crawl.
     vec3 k = uRing * vec3(1.0, 0.618, 1.414);    // rings per degree, per layer
     vec3 v = vec3(0.41, 0.23, 0.67);             // outward speed, per layer
+    if (uDir > 0.5 && uDir < 1.5) v = -v;        // inward: every layer flows toward the center
+    else if (uDir > 1.5) v.y = -v.y;             // both: the middle layer flows inward through the other two
     vec3 o = vec3(0.0, 0.37, 0.71);              // starting offsets
     float dark = 0.0;
     for (int i = 0; i < 3; i++) {
@@ -2731,7 +2742,7 @@ function makeRenderer(gl) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
   const loc = n => gl.getUniformLocation(pr, n);
-  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide','uTxt','uTxtA','uStat','uSeed','uBlur','uCandle','uCandleMove','uDis','uDisC','uRing','uDepth'].map(n => [n, loc(n)]));
+  const U = Object.fromEntries(['uC','uPPR','uFlash','uOff','uOn','uPat','uT','uDotCol','uDotR','uDotA','uSymCol','uBreath','uGuide','uProg','uSide','uTxt','uTxtA','uStat','uSeed','uBlur','uCandle','uCandleMove','uDis','uDisC','uRing','uDepth','uDir'].map(n => [n, loc(n)]));
   const disA = new Float32Array(16), disB = new Float32Array(16);
   const aP = gl.getAttribLocation(pr, 'p');
   // Text texture for the rate readout: a dark pill with light text, so it reads on both the flash and the dark phase.
@@ -2760,7 +2771,7 @@ function makeRenderer(gl) {
       const E = F.eye(eyeIdx);
       gl.uniform2f(U.uC, cx, cy); gl.uniform1f(U.uPPR, ppr);
       gl.uniform3fv(U.uFlash, E.flash); gl.uniform3fv(U.uOff, E.off); gl.uniform1f(U.uOn, E.on ? 1 : 0);
-      gl.uniform1i(U.uPat, F.pattern); gl.uniform1f(U.uT, F.ptime); gl.uniform1f(U.uRing, F.pscale || 5); gl.uniform1f(U.uDepth, F.pdepth ?? 0.5);
+      gl.uniform1i(U.uPat, F.pattern); gl.uniform1f(U.uT, F.ptime); gl.uniform1f(U.uRing, F.pscale || 5); gl.uniform1f(U.uDepth, F.pdepth ?? 0.5); gl.uniform1f(U.uDir, F.pdir || 0);
       if (F.dot) {
         gl.uniform1f(U.uDotA, 1); gl.uniform3fv(U.uDotCol, F.dot.rgb);
         gl.uniform1f(U.uDotR, Math.max(1.5, Math.tan(F.dot.deg * Math.PI / 360) * ppr));
