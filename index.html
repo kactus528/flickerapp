@@ -375,7 +375,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
         <div class="presets" data-key="breathPattern" role="group" aria-label="Breath pattern">
           <button class="chip" data-v="444">Box 4-4-4-4</button>
           <button class="chip" data-v="478">4-7-8</button>
-          <button class="chip" data-v="res">Resonance</button>
+          <button class="chip" data-v="res">Coherence 5.5-5.5</button>
         </div>
         <div class="row">
           <label for="b_breathRounds">Guided breaths <output data-for="b_breathRounds"></output></label>
@@ -749,7 +749,7 @@ textarea:focus-visible, input[type=text]:focus-visible { outline: 2px solid var(
           <div class="presets" data-key="breathPattern" role="group" aria-label="Breath pattern">
           <button class="chip" data-v="444">Box 4-4-4-4</button>
           <button class="chip" data-v="478">4-7-8</button>
-          <button class="chip" data-v="res">Resonance</button>
+          <button class="chip" data-v="res">Coherence 5.5-5.5</button>
         </div>
           <p class="note" id="patternNote"></p>
         </div>
@@ -1174,7 +1174,7 @@ delete state.kind;
 const BREATH_PATTERNS = {
   '444': { name: 'box', phases: c => [c.breathSec, c.breathSec, c.breathSec, c.breathSec], note: c => `Box breathing: in ${c.breathSec}, hold ${c.breathSec}, out ${c.breathSec}, hold empty ${c.breathSec}.` },
   '478': { name: '4-7-8', phases: () => [4, 7, 8, 0], note: () => 'In 4, hold 7, out 8. A slow, settling breath.' },
-  'res': { name: 'Resonance', phases: () => [5.5, 0, 5.5, 0], note: () => 'In 5.5 seconds, out 5.5: about 5.5 breaths a minute, the pace studied most for calming the body.' }
+  'res': { name: 'coherence', phases: () => [5.5, 0, 5.5, 0], note: () => 'Coherence (resonance) breathing: in 5.5 seconds, out 5.5, no holds. About 5.5 breaths a minute, the pace at which heart rhythm rises and falls smoothly with each breath. The best-studied breathing pace for calming the body.' }
 };
 const breathPhases = c => (BREATH_PATTERNS[c.breathPattern] || BREATH_PATTERNS['444']).phases(c);
 const breathCycle = c => breathPhases(c).reduce((a, b) => a + b, 0);
